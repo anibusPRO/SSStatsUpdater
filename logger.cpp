@@ -42,7 +42,8 @@ void logger::installLog()
     logStream = new QTextStream(logFile);
 
     #ifdef Q_WS_WIN
-    logStream->setCodec("Windows-1251");
+//    logStream->setCodec("Windows-1251");
+    logStream->setCodec("utf-8");
     // Под остальными ОС - utf8
     #else
     logStream->setCodec("utf-8");

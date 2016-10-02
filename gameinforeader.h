@@ -27,7 +27,7 @@ public:
     QString get_sender_name(bool init=false);
     QString read_warnings_log(QString str, int offset=0);
     QString get_cur_profile_dir(QString path);
-
+    bool isPlayback();
 //    inline QVariantMap to_map(QByteArray array)
 //    {
 //    #ifdef HAVE_QT5

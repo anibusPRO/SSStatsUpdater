@@ -17,7 +17,6 @@ StatsCollector::StatsCollector()
     app = new QCoreApplication(argc, NULL);
     log.installLog();
     sender.setMaxWaitTime(10000);
-//    app->exec();
 }
 
 StatsCollector::~StatsCollector()
@@ -26,6 +25,55 @@ StatsCollector::~StatsCollector()
     delete app;
 }
 
+QString StatsCollector::get_soulstorm_installlocation()
+{
+    QString ss_path;
+    QSettings hklm("HKEY_LOCAL_MACHINE", QSettings::NativeFormat);
+    for(int i=0; i<hklm.childGroups().size(); ++i)
+    {
+        if(hklm.childGroups().at(i).toLower()==QString("SOFTWARE").toLower())
+        {
+
+            QSettings software("HKEY_LOCAL_MACHINE\\"+hklm.childGroups().at(i), QSettings::NativeFormat);
+            for(int j=0; j<software.childGroups().size(); ++j)
+            {
+                if(software.childGroups().at(j).toLower()==QString("THQ").toLower())
+                {
+                    QSettings thq(software.fileName()+"\\"+software.childGroups().at(j), QSettings::NativeFormat);
+                    for(int k=0; k<thq.childGroups().size(); ++k)
+                    {
+                        if(thq.childGroups().at(k).toLower()==QString("Dawn of War - Soulstorm").toLower())
+                        {
+                            QSettings soulstorm(thq.fileName()+"\\"+thq.childGroups().at(k), QSettings::NativeFormat);
+                            if(soulstorm.contains("installlocation"))
+                                ss_path =  soulstorm.value("installlocation").toString();
+                            if(!ss_path.isNull()) return ss_path;
+                            else break;
+                        }
+                    }
+                }
+                if(software.childGroups().at(j).toLower()==QString("SEGA").toLower())
+                {
+                    QSettings sega(software.fileName()+"\\"+software.childGroups().at(j), QSettings::NativeFormat);
+                    for(int k=0; k<sega.childGroups().size(); ++k)
+                    {
+                        if(sega.childGroups().at(k).toLower()==QString("Dawn of War - Soulstorm").toLower())
+                        {
+                            QSettings soulstorm(sega.fileName()+"\\"+sega.childGroups().at(k), QSettings::NativeFormat);
+                            if(soulstorm.contains("installlocation"))
+                                ss_path =  soulstorm.value("installlocation").toString();
+                            if(!ss_path.isNull()) return ss_path;
+                            else break;
+                        }
+                    }
+
+                }
+            }
+            break;
+        }
+    }
+    return QString();
+}
 void StatsCollector::start()
 {
 
@@ -56,11 +104,9 @@ void StatsCollector::start()
 //      lpThreadId);
 //    }
 
+//    QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\thq\\dawn of war - soulstorm\\", QSettings::NativeFormat);
 
-
-    QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\thq\\dawn of war - soulstorm\\", QSettings::NativeFormat);
-
-    QString ss_path =  settings.value("installlocation").toString();
+    QString ss_path =  get_soulstorm_installlocation();
 
     QDir temp_dir(ss_path);
 //    temp_dir.cdUp();
@@ -80,13 +126,13 @@ void StatsCollector::start()
         {
             info.refresh();
             time = info.lastModified();
-            if(time > old_time)
+            if((time > old_time)&&(!reader.isPlayback()))
             {
                 old_time = time;
                 if(send_stats(path_to_profile))
                     qDebug() << "Match results sent";
                 else
-                    qDebug() << "Match results are not sent";
+                    qDebug() << "Match results were not sent";
             }
 //            QTime t;
 //            t = QTime::fromString("15:45:35.88", "hh:mm:ss.z");
@@ -133,7 +179,7 @@ bool StatsCollector::send_stats(QString path_to_profile)
 bool StatsCollector::init_player()
 {
     qDebug() << "Player initialization";
-    if(!reader.get_sender_name().isNull())
+    if(!reader.get_sender_name(true).isNull())
     {
         qDebug() << "Player successfully initialized";
         return true;

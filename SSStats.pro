@@ -20,7 +20,13 @@ SOURCES +=     main.cpp \
     gameinforeader.cpp \
     gameinfo.cpp \
     statscollector.cpp \
-    logger.cpp
+    logger.cpp \
+#    replay.cpp \
+#    game_action.cpp \
+#    player.cpp \
+#    winconditions.cpp \
+#    gamesettings.cpp \
+#    repreader.cpp
 #ssstats.cpp \
 
 
@@ -29,7 +35,13 @@ HEADERS += request.h \
         gameinforeader.h \
         gameinfo.h \
         statscollector.h \
-    logger.h
+    logger.h \
+#    replay.h \
+#    game_action.h \
+#    player.h \
+#    winconditions.h \
+#    gamesettings.h \
+#    repreader.h
 #ssstats.h\
 #        ssstats_global.h \
 

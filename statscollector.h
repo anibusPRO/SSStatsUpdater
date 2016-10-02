@@ -6,39 +6,38 @@
 #include "gameinfo.h"
 #include "logger.h"
 #include <QCoreApplication>
-//#include <QObject>
 
 using namespace Network;
 
-class StatsCollector /*: public QObject*/
+class StatsCollector
 {
-//    Q_OBJECT
-
 public:
-
-    QCoreApplication * app;
-
     StatsCollector();
     ~StatsCollector();
+    void start();
 
+    // для хранения адреса сервера
+    QString server_addr;
+    // для хранения текущего активного профиля
+    // имя папки профиля можно узнать так же из файла Local.ini
+    QString _cur_profile;
+    // флаг опредляющий выполнение основного цикла работы программы
+    bool stop=false;
 
+private:
+    QCoreApplication * app;
+
+    // получает путь до игры из реестра windows
+    QString get_soulstorm_installlocation();
+    // отправляет статистику взятую из файлв testStats.lua в папке path_to_profile
     bool send_stats(QString path_to_profile);
+    // инициализирует игрока на сервере путем отправки steam_id игрока
     bool init_player();
-
-    RequestSender sender;
 
     GameInfo *info;
     GameInfoReader reader;
     logger log;
-
-//    QString testStats_path;
-    QString server_addr;
-    QString _cur_profile;
-    bool stop=false;
-//    QString ss_path;
-
-//public slots:
-    void start();
+    RequestSender sender;
 
 };
 

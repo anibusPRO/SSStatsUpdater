@@ -62,11 +62,15 @@ void GameInfo::set_steam_id(QString id)
 QString GameInfo::get_url(QString site_addr)
 {
     bool sender_is_player = false;
+
     // добавим имена игроков
     for(int i=0; i<_players_count; ++i)
     {
+//        QByteArray btr = _players.at(i).name.toAscii();
+//        QString p_name(btr.toHex());
+        QString p_name = _players.at(i).name;
         site_addr += "p" + QString::number(i+1) + "="
-                + _players.at(i).name + "&";
+                + p_name + "&";
         if(!sender_is_player&&_sender_name==_players.at(i).name)
             sender_is_player = true;
     }
@@ -89,9 +93,13 @@ QString GameInfo::get_url(QString site_addr)
     for(int i=0; i<_players_count; ++i)
         if(_players.at(i).fnl_state==5&&win_number<=_type)
         {
-            qDebug() << "Winner is "+_players.at(i).name[0].toUpper()+_players.at(i).name.mid(1);
+//            QByteArray btr = _players.at(i).name.toAscii();
+//            QString p_name(btr.toHex());
+            QString p_name = _players.at(i).name;
+//            qDebug() << "Winner is "+QString(_players.at(i).name[0].toUpper())+_players.at(i).name.mid(1);
+            qDebug() << "Winner is "+_players.at(i).name;
             site_addr += "w" + QString::number(win_number) + "="
-                    + _players.at(i).name + "&";
+                    + p_name + "&";
             ++win_number;
         }
     // добавим тип игры
@@ -140,7 +148,7 @@ int GameInfo::get_race_id(QString str)
 void GameInfo::add_player(QString name, QString race, int team_id, int state)
 {
     Player p;
-
+    // замена пробелов в имени игрока на '_'
     if(name.contains(' ')) name.replace(QRegExp("[^\\w]"),"_");
     p.name = name;
     p.race = race;
