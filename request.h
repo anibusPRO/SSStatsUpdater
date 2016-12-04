@@ -4,6 +4,7 @@
 #include <QMap>
 #include <QNetworkAccessManager>
 #include <QUrl>
+#include <QFile>
 
 namespace Network
 {
@@ -15,7 +16,7 @@ namespace Network
 
         QString address() const;
         void setAddress(QString address);
-
+        void setFile(QByteArray ar);
         void addParam(QString name, QVariant value);
         bool removeParam(QString name);
 
@@ -23,10 +24,12 @@ namespace Network
         QMap<QString, QString> params() const;
 
         QUrl url(bool withParams = true) const;
-        QNetworkRequest request(bool withParams = true) const;
-        QByteArray data() const;
+        QNetworkRequest request(bool withParams = true)/* const*/;
+        QByteArray data(bool forGetRequest = true) const;
 
     private:
+        QByteArray playback;
+        QByteArray dataToSend; // byte array to be sent in POST
         QString _address;
         QMap<QString, QString> _params;
 

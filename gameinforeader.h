@@ -5,7 +5,8 @@
 #include <QVariantMap>
 #include <QByteArray>
 #include <QString>
-
+#include "repreader.h"
+#include <QTime>
 #include "gameinfo.h"
 
 #ifdef HAVE_QT5
@@ -16,6 +17,8 @@
 
 #define STEAM_API_KEY "B09655A1E41B5DE93AD3F27087D25884"
 
+#define MINIMUM_DURATION 30
+
 
 class GameInfoReader
 {
@@ -23,11 +26,21 @@ public:
     GameInfoReader();
     ~GameInfoReader();
 
-    GameInfo *get_game_info(QString profile);
+    GameInfo *get_game_info(QString profile, QString path_to_playback);
     QString get_sender_name(bool init=false);
     QString read_warnings_log(QString str, int offset=0);
     QString get_cur_profile_dir(QString path);
+    QByteArray get_playback_file();
+
+    void setAverageAPM(int apm);
     bool isPlayback();
+    bool isGameGoing();
+    bool timeCompare(QTime t1, QTime t2);
+    QTime last_playback;
+    QTime last_startgame;
+    QTime last_stopgame;
+    int average_apm;
+
 //    inline QVariantMap to_map(QByteArray array)
 //    {
 //    #ifdef HAVE_QT5
@@ -56,6 +69,9 @@ public:
 //    }
 private:
     GameInfo *_game_info;
+    //  ридер реплеев
+    RepReader *rep_reader;
+    QByteArray _playback;
 
 };
 

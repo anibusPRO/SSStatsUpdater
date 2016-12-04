@@ -5,13 +5,14 @@
 #include <QVector>
 #include <QMap>
 
-#define SERVER_KEY "80bc7622e3ae9980005f936d5f0ac6cc"
+#define SERVER_KEY "80bc7622e3ae9980005f936d5f0ac6cd"
 
-struct Player
+struct TSPlayer
 {
     QString name;
     QString race;
     int team;
+    int apm;
     int fnl_state;
 };
 
@@ -21,32 +22,34 @@ class GameInfo
 public:
     GameInfo(int players_count);
     ~GameInfo();
-    void add_player(QString name, QString race, int team_id, int state);
+    void add_player(QString name, QString race, int team_id, int state, int apm);
     void set_type(int type);
     void set_winby(QString str);
     void set_duration(int time);
     void set_team_number(int num);
     void set_sender_name(QString name);
+    QString get_sender_name();
     void set_steam_id(QString id);
     QString get_url(QString site_addr);
     void set_map_name(QString str);
     void set_mod_name(QString name);
 
-private:
-    int get_race_id(QString str);
+    static QString toUtf16Hex(QString str);
 
-    QString _map_name;
-    QVector<Player> _players;
+private:
+
+    QVector<TSPlayer> _players;    QString _map_name;
+    QMap<QString, int> races;
+
     int _type;
-    QString _winby;
     int _teams_number;
     int _players_count;
     int _duration;
+    QString _winby;
     QString _steam_id;
     QString _sender_name;
     QString _mod_name;
 
-    QMap<QString, int> races;
 
 
 };

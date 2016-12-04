@@ -32,6 +32,11 @@ namespace Network
         _address = address;
     }
 
+    void Request::setFile(QByteArray ar)
+    {
+        playback = ar;
+    }
+
     void Request::addParam(QString name, QVariant value)
     {
         _params[name] = value.toString();
@@ -64,43 +69,88 @@ namespace Network
     {
         QUrl url(address());
         if (forGetRequest)
-            url.setEncodedQuery(data());
+            url.setEncodedQuery(data(forGetRequest));
 //            url.setQuery(data());
         return url;
     }
 
-    QNetworkRequest Request::request(bool forGetRequest /*= true*/) const
+    QNetworkRequest Request::request(bool forGetRequest /*= true*/)/* const*/
     {
         QNetworkRequest r(url(forGetRequest));
 
         if (!forGetRequest)
         {
-            r.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+            qDebug() << "file size:" << playback.size();
+            QByteArray param1Name="param1" ,param1Value="value1";
+            QByteArray param2Name="replay", param2FileName="temp.rec",
+                param2ContentType="application/octet-stream", param2Data=playback;
+
+            //задаем разделитель
+            QByteArray postData, boundary="1BEF0A57BE110FD467A";
+            //первый параметр
+            postData.append("--"+boundary+"\r\n");//разделитель
+            //имя параметра
+            postData.append("Content-Disposition: form-data; name=\"");
+            postData.append(param1Name);
+            postData.append("\"\r\n\r\n");
+            //значение параметра
+            postData.append(param1Value);
+            postData.append("\r\n");
+
+            //параметр 2 - файл
+            postData.append("--"+boundary+"\r\n");//разделитель
+            //имя параметра
+            postData.append("Content-Disposition: form-data; name=\"");
+            postData.append(param2Name);
+            //имя файла
+            postData.append("\"; filename=\"");
+            postData.append(param2FileName);
+            postData.append("\"\r\n");
+            //тип содержимого файла
+            postData.append("Content-Type: "+param2ContentType+"\r\n");
+            //передаем в base64
+            postData.append("Content-Transfer-Encoding: binary\r\n\r\n");
+            //данные
+            postData.append(param2Data);
+            postData.append("\r\n");
+            //"хвост" запроса
+            postData.append("--"+boundary+"--\r\n");
+
+
+            r.setHeader(QNetworkRequest::ContentTypeHeader,"multipart/form-data; boundary="+boundary);
+            r.setHeader(QNetworkRequest::ContentLengthHeader,QByteArray::number(postData.length()));
+            dataToSend = postData;
         }
-//        qDebug() << "return r";
+
+
         return r;
     }
 
-    QByteArray Request::data() const
+    QByteArray Request::data(bool forGetRequest /*= true*/) const
     {
-        auto b = _params.begin();
-        auto e = _params.end();
-
-        QByteArray byteArrayData;
-
-        while (b != e)
+        qDebug() << "forGetRequest" << forGetRequest;
+        if(forGetRequest)
         {
-            byteArrayData.append(b.key());
-            byteArrayData.append('=');
-            byteArrayData.append(b.value());
-            byteArrayData.append('&');
+            auto b = _params.begin();
+            auto e = _params.end();
 
-            b++;
+            QByteArray byteArrayData;
+
+            while (b != e)
+            {
+                byteArrayData.append(b.key());
+                byteArrayData.append('=');
+                byteArrayData.append(b.value());
+                byteArrayData.append('&');
+
+                b++;
+            }
+
+            byteArrayData.chop(1);
+            return byteArrayData;
         }
+        else return dataToSend;
 
-        byteArrayData.chop(1);
-
-        return byteArrayData;
     }
 
 }

@@ -1,27 +1,29 @@
 #include "statscollector.h"
-//#include <QTimer>
 #include <QFileInfo>
 #include <QThread>
 #include <QDebug>
 #include <QDateTime>
-
 #include <QDir>
 #include <QSettings>
-
-
+#include <QObject>
 
 StatsCollector::StatsCollector()
 {
     app = NULL;
     int argc = 0;
     app = new QCoreApplication(argc, NULL);
+    QTextCodec::setCodecForTr(QTextCodec::codecForName("utf-8"));
+    QTextCodec::setCodecForCStrings(QTextCodec::codecForName("utf-8"));
+
     log.installLog();
     sender.setMaxWaitTime(10000);
+
 }
 
 StatsCollector::~StatsCollector()
 {
     log.finishLog();
+    delete apm_meter;
     delete app;
 }
 
@@ -82,93 +84,116 @@ void StatsCollector::start()
         qDebug() << "problems with player initialization";
         return;
     }
-//    DWORD  MyThreadFunction( LPVOID lpParam )
-//    {
-//     QCoreApplication * app = NULL;
-//     int argc = 0;
-//     app = new QCoreApplication(argc, NULL);
-////     QLibrary * dllClass =  new QLibrary();
-//     app->exec();
-//     return DWORD();
-//    }
-
-//    extern "C" QLIBRARY_EXPORT  void  instance()
-//    {
-//     LPDWORD lpThreadId = NULL;
-//     CreateThread(
-//      NULL,                   // default security attributes
-//      0,                      // use default stack size
-//      (LPTHREAD_START_ROUTINE)MyThreadFunction,       // thread function name
-//      NULL,          // argument to thread function
-//      0,                      // use default creation flags
-//      lpThreadId);
-//    }
-
-//    QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\thq\\dawn of war - soulstorm\\", QSettings::NativeFormat);
 
     QString ss_path =  get_soulstorm_installlocation();
-
     QDir temp_dir(ss_path);
-//    temp_dir.cdUp();
+
     qDebug() << temp_dir.path();
     _cur_profile = reader.get_cur_profile_dir(ss_path);
     // если не удалось получить имя текущего профиля, то используем по умолчанию первый профиль
     if(_cur_profile=="") _cur_profile = "Profile1";
     QString path_to_profile = ss_path +"/Profiles/"+ _cur_profile;
-
+    QString path_to_playback = ss_path +"/Playback/";
     QFileInfo info(path_to_profile +"/testStats.lua");
 
-    if(info.exists())
+    qDebug() << "check testStats.lua exists";
+    QDateTime old_time;
+    QDateTime time;
+    while(!info.exists())
     {
-        QDateTime old_time = info.lastModified();
-        QDateTime time;
-        while(!stop)
+        info.refresh();
+        QThread::currentThread()->msleep(5000);
+    }
+    old_time = info.lastModified();
+
+    qDebug() << "create thread for apm meter";
+    QThread* thread = new QThread;
+    apm_meter = new APMMeter();
+    apm_meter->moveToThread(thread);
+//    QObject::connect(thread, SIGNAL(started()), apm_meter, SLOT(start()));
+    QObject::connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+    QObject::connect(this, SIGNAL(start_meter()), apm_meter, SLOT(start()));
+    thread->start();
+
+
+//    QThread::currentThread()->msleep(5000);
+    while(!stop)
+    {
+        int apm;
+//        qDebug() << "start";
+//        apm_meter->start();
+
+        info.refresh();
+        time = info.lastModified();
+//        qDebug() << "check info updates";
+        if(time > old_time)
         {
-            info.refresh();
-            time = info.lastModified();
-            if((time > old_time)&&(!reader.isPlayback()))
+            apm = apm_meter->getAverageAPM();
+            qDebug() << "Current:" << apm_meter->getCurrentAPM() << "Average:" << apm << "Max:" << apm_meter->getMaxAPM();
+            if(!reader.isPlayback()/*&&!reader.isGameGoing()*/)
             {
-                old_time = time;
-                if(send_stats(path_to_profile))
+//                qDebug() << "game is not playback and not going";
+                reader.setAverageAPM(apm_meter->getAverageAPM());
+                if(send_stats(path_to_profile, path_to_playback))
                     qDebug() << "Match results sent";
                 else
                     qDebug() << "Match results were not sent";
+                apm_meter->stop();
+                qDebug() << "stop meter";
             }
-//            QTime t;
-//            t = QTime::fromString("15:45:35.88", "hh:mm:ss.z");
+            else
+            {
+                /* going or*/
+                qDebug() << "Current game is playback";
+            }
+//                apm_meter->start();
+//                if(!thread->isRunning()) thread->start();
 
-//            QTime t_start = QTime::fromString(reader.read_warnings_log("Starting mission", -3), "hh:mm:ss.z");
-//            QTime t_end = QTime::fromString(reader.read_warnings_log("Ending mission", -3), "hh:mm:ss.z");
-//            QTime t_abort = QTime::fromString(reader.read_warnings_log("Ending mission (Abort)", -3), "hh:mm:ss.z");
-//            if(t_end>t_start&&t_end==t_abort)
-//                send_stats("Disconnect");
 
-//                game_exec = true;
-//            if("Ending"==reader.read_warnings_log("Ending mission")&&
-//                    "(Abort)"==)
-            QThread::currentThread()->msleep(5000);
+            old_time = time;
+
+            if(apm_meter->stop_flag&&reader.isGameGoing())
+            {
+                qDebug() << "start meter";
+                emit start_meter();
+            }
         }
+//        qDebug() << apm_meter->stop_flag << reader.isGameGoing();
+
+//        apm = apm_meter->getAverageAPM();
+//        qDebug() << "VOT ONO! VOT ONO ZNACHENIE APM:" << apm << apm_meter->getCurrentAPM();
+
+        QThread::currentThread()->msleep(10000);
     }
-    else
-        qDebug() << "file testStats.lua not exists";
+    apm_meter->stop();
 }
 
-bool StatsCollector::send_stats(QString path_to_profile)
+bool StatsCollector::send_stats(QString path_to_profile, QString path_to_playback)
 {
-    info = reader.get_game_info(path_to_profile);
+    info = reader.get_game_info(path_to_profile, path_to_playback);
+
     if(info!=0)
     {
-//        info->get_url(server_addr"http://tpmodstat.16mb.com/connect.php?");
         QString url = info->get_url(server_addr);
 //        qDebug() << url;
         if(!url.isNull())
         {
             Request request(url);
-            if(sender.get(request).isNull())
-                qDebug() << "Server returned empty data";
+//            QFile playback(path_to_playback+"temp.rec");
+//            if(!playback.open(QIODevice::ReadWrite))
+//            {
+//                qDebug() << "Could not open temp.rec";
+//                return 0;
+//            }
+            request.setFile(reader.get_playback_file());
+
+//            if(sender.get(request).isNull())
+//                qDebug() << "Server returned empty data";
+
+            qDebug() << "Ответ от сервера:" << QString::fromUtf8(sender.post(request).data());
+//            playback->close();
+//            delete playback;
         }
-        else
-            return false;
     }
     else
         return false;

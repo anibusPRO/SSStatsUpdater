@@ -5,7 +5,7 @@
 #-------------------------------------------------
 
 QT       += core network
-QT       -= gui
+QT       += gui
 QMAKE_CXXFLAGS += -std=c++11
 CONFIG -= console
 
@@ -21,12 +21,15 @@ SOURCES +=     main.cpp \
     gameinfo.cpp \
     statscollector.cpp \
     logger.cpp \
-#    replay.cpp \
-#    game_action.cpp \
-#    player.cpp \
-#    winconditions.cpp \
-#    gamesettings.cpp \
-#    repreader.cpp
+    replay.cpp \
+    game_action.cpp \
+    player.cpp \
+    winconditions.cpp \
+    gamesettings.cpp \
+    repreader.cpp \
+    extendedbinreader.cpp \
+    languageservice.cpp \
+    apmmeter.cpp
 #ssstats.cpp \
 
 
@@ -36,17 +39,31 @@ HEADERS += request.h \
         gameinfo.h \
         statscollector.h \
     logger.h \
-#    replay.h \
-#    game_action.h \
-#    player.h \
-#    winconditions.h \
-#    gamesettings.h \
-#    repreader.h
+    replay.h \
+    game_action.h \
+    player.h \
+    winconditions.h \
+    gamesettings.h \
+    repreader.h \
+    extendedbinreader.h \
+    languageservice.h \
+    apmmeter.h
 #ssstats.h\
 #        ssstats_global.h \
 
 
+SOURCES += APMShared/APMConfig.cpp \
+    APMShared/APMLogger.cpp \
+    APMShared/APMMeasure.cpp \
+    APMShared/APMTrigger.cpp \
+    APMShared/ProcessResolver.cpp
 
+#HEADERS += APMKeyHook/targetver.h \
+HEADERS +=    APMShared/APMConfig.h \
+    APMShared/APMLogger.h \
+    APMShared/APMMeasure.h \
+    APMShared/APMTrigger.h \
+    APMShared/ProcessResolver.h
 
 
 #TARGET = soulstorm_stats

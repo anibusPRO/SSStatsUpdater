@@ -4,8 +4,8 @@
 #include "requestsender.h"
 #include <QVariantList>
 #include <QCoreApplication>
-#include <QTime>
 #include <QSettings>
+
 using namespace Network;
 
 GameInfoReader::GameInfoReader()
@@ -15,18 +15,61 @@ GameInfoReader::GameInfoReader()
 
 GameInfoReader::~GameInfoReader()
 {
-    if(_game_info!=0)
-        delete _game_info;
+    if(_game_info) delete _game_info;
+    if(rep_reader) delete rep_reader;
 }
+bool GameInfoReader::timeCompare(QTime t1, QTime t2)
+{
+    if((t1.hour()>t2.hour()))
+        return true;
+    if((t1.hour()==t2.hour())&&(t1.minute()>t2.minute()))
+        return true;
+    return false;
+}
+
+bool GameInfoReader::isGameGoing()
+{
+//    QTime t_stopgame;
+//    QString stopgame_time_str = read_warnings_log("Game Stop", -3);
+//    if(stopgame_time_str.isNull())
+//        return false;
+//    if(stopgame_time_str != "")
+//        t_stopgame = QTime::fromString(stopgame_time_str, "hh:mm:ss.z");
+//    else t_stopgame = QTime::fromString("00:00:00.00", "hh:mm:ss.z");
+//    last_stopgame = t_stopgame;
+//    qDebug() << read_warnings_log("Game Start", -3);
+//    qDebug() << last_startgame.toString() << last_stopgame.toString();
+//    qDebug() << (last_startgame>last_stopgame);
+    if(!last_startgame.isNull())
+        return last_startgame>last_stopgame;
+    return false;
+//    QString startgame_time_str = read_warnings_log("Game Start", -3);
+//    if(startgame_time_str.isNull()||startgame_time_str== "")
+//        return false;
+//    QTime t_startgame = QTime::fromString(startgame_time_str, "hh:mm:ss.z");
+
+//    return (t_startgame>t_stopgame);
+}
+
 
 bool GameInfoReader::isPlayback()
 {
-    QTime t_playback = QTime::fromString(read_warnings_log("Game Playback", -3), "hh:mm:ss.z");
-    QTime t_gamestart = QTime::fromString(read_warnings_log("Game Start", -3), "hh:mm:ss.z");
-    if((t_gamestart.minute()-t_playback.minute())<2)
-        return true;
-    else
-        return false;
+    read_warnings_log("Game Start", -3);
+    qDebug() << last_startgame.toString() << last_playback.toString();
+    return last_startgame<last_playback;
+//    QString playback_time_str = read_warnings_log("Game Playback", -3);
+//    if(playback_time_str.isNull())
+//        return false;
+//    QTime t_playback = QTime::fromString(playback_time_str, "hh:mm:ss.z");
+//    last_playback = t_playback;
+//    QString gamestart_time_str = read_warnings_log("Game Start", -3);
+//    if(gamestart_time_str.isNull())
+//        return false;
+//    QTime t_startgame = QTime::fromString(gamestart_time_str, "hh:mm:ss.z");
+//    last_startgame = t_startgame;
+
+//    return (t_startgame>t_playback);
+
 }
 
 QString GameInfoReader::get_cur_profile_dir(QString path)
@@ -65,10 +108,21 @@ QString GameInfoReader::get_cur_profile_dir(QString path)
     return profile;
 }
 
-GameInfo *GameInfoReader::get_game_info(QString profile)
+QByteArray GameInfoReader::get_playback_file()
+{
+    return _playback;
+}
+
+void GameInfoReader::setAverageAPM(int apm)
+{
+    average_apm = apm;
+}
+
+GameInfo *GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 {
     QByteArray data;
-
+    qDebug() << profile;
+    qDebug() << path_to_playback;
     QFile file(profile + "/testStats.lua");
 
     qDebug() << "Getting the game data";
@@ -90,8 +144,10 @@ GameInfo *GameInfoReader::get_game_info(QString profile)
     file.seek(i);
 
     data = file.readAll();
-
+    file.close();
     QVariantMap stats = QtJson::to_map(data);
+
+
     // но у меня все было ок, поэтому я на всякий случай сделаю проверку без 3 байт полезных данных
     if(stats.contains("GSGameStats"))
     {
@@ -117,14 +173,14 @@ GameInfo *GameInfoReader::get_game_info(QString profile)
                 qDebug() << "GSGameStats does not contain Duration";
 
             // если условие победы не пустое
-            if(!winby.isNull()&&winby!="")
+            if((!winby.isNull())&&winby!="")
             {
                 // добавим условие победы
                 _game_info->set_winby(winby);
                 qDebug() << "WinBy:" << winby.toUpper();
             }
             else
-                if(duration<30)
+                if(duration<MINIMUM_DURATION)
                 {
                     qDebug() << "The current game is still in progress";
                     return 0;
@@ -133,7 +189,7 @@ GameInfo *GameInfoReader::get_game_info(QString profile)
                 {
                     // запишим условие победы как дисконнект
                     _game_info->set_winby("disconnect");
-                    qDebug() << "WinBy:" << winby.toUpper();
+                    qDebug() << "WinBy:" << "Disconnect";
                 }
 
             if(GSGameStats.contains("Scenario"))
@@ -146,11 +202,11 @@ GameInfo *GameInfoReader::get_game_info(QString profile)
             {
                 team_num = GSGameStats.value("Teams").toInt();
                 _game_info->set_team_number(team_num);
-                if(team_num!=2)
-                {
-                    qDebug() << "Unsupported type of game."<<"Count of teams:"<<team_num;
-                    return 0;
-                }
+//                if(team_num!=2)
+//                {
+//                    qDebug() << "Unsupported type of game."<<"Count of teams:"<<team_num;
+//                    return 0;
+//                }
             }
             else
             {
@@ -158,78 +214,129 @@ GameInfo *GameInfoReader::get_game_info(QString profile)
                 return 0;
             }
 
-            int team_1_p_count=0, team_2_p_count=0, first_team_id=0;
-            for(int i=0; i<players_count;++i)
-            {
-                QString player_id = "player_"+QString::number(i);
-                if(GSGameStats.contains(player_id))
-                {
-                    QVariantMap player = GSGameStats.value(player_id).toMap();
-                    if(player.contains("PHuman"))
-                    {
-                        if(player.value("PHuman").toInt()==1)
-                        {
-                            if(player.contains("PName")&&player.contains("PRace")
-                                    &&player.contains("PFnlState")&&player.contains("PTeam"))
-                            {
-                                if(i==0)
-                                {
-                                    first_team_id = player.value("PTeam").toInt();
-                                    ++team_1_p_count;
-                                }
-                                else
-                                    if(first_team_id==player.value("PTeam").toInt())
-                                        ++team_1_p_count;
-                                    else
-                                        team_2_p_count = player.value("PTeam").toInt();
-                                _game_info->add_player(player.value("PName").toString(), player.value("PRace").toString(),
-                                                       player.value("PTeam").toInt(), player.value("PFnlState").toInt());
-                            }
-                            else
-                            {
-                                return 0;
-                                qDebug() << "Player does not contain players info";
-                            }
-                        }
-                        else
-                        {
-                            qDebug() << "Player is not Human";
-                            return 0;
-                        }
-                    }
-                    else
-                    {
-                        qDebug() << "Player does not contain PHuman";
-                        return 0;
-                    }
-                }
-                else
-                {
-                    qDebug() << "GSGameStats does not contain" << player_id;
-                    return 0;
-                }
-            }
-            if(team_1_p_count==team_2_p_count)
-                _game_info->set_type(team_1_p_count);
-            else
-                qDebug() << "invalid game type";
+            QString sender_name = get_sender_name();
 
-            QString name = get_sender_name();
-
-//            if(!abort.isNull()&& name)
-
-
-            if(!name.isNull())
-                _game_info->set_sender_name(name);
+            if(!sender_name.isNull())
+                _game_info->set_sender_name(sender_name);
             else
             {
                 qDebug() << "sender name is null";
                 return 0;
             }
-            QString mod_name = read_warnings_log("Initializing", 2);
+            QString mod_name = read_warnings_log("MOD -- Initializing Mod", 4);
             qDebug() << "Mod name is" << mod_name;
             // добавим название последнего запущенного мода к информации об игре
             _game_info->set_mod_name(mod_name);
+
+            qDebug() << "playback reading";
+//            // откроем реплей файл последней игры для чтения
+            QFile pfile(path_to_playback+"temp.rec");
+            if(!pfile.open(QIODevice::ReadWrite))
+            {
+                qDebug() << "Could not open temp.rec";
+                return 0;
+            }
+            rep_reader = new RepReader;
+            // создадим поток данны из файла
+            QDataStream in(&pfile);
+            // прочитаем реплей
+//            try{
+            rep_reader->ReadReplayFully(&in, pfile.fileName());
+            // переименовываем название реплея в игре по стандарту
+            rep_reader->RenameReplay();
+            pfile.seek(0);
+            _playback = pfile.readAll();
+//            }
+//            catch(...)
+//            {
+//                playback.close();
+//            }
+            pfile.close();
+
+            // если настройки игры стандартные, то отправим статистику
+            int team_1_p_count=0, team_2_p_count=0, first_team_id=0;
+            if(rep_reader->isStandart())
+            {
+                for(int i=0; i<players_count;++i)
+                {
+                    QString player_id = "player_"+QString::number(i);
+                    if(GSGameStats.contains(player_id))
+                    {
+                        QVariantMap player = GSGameStats.value(player_id).toMap();
+                        if(player.contains("PHuman"))
+                        {
+                            if(player.value("PHuman").toInt()==1)
+                            {
+                                if(player.contains("PName")&&player.contains("PRace")
+                                        &&player.contains("PFnlState")&&player.contains("PTeam"))
+                                {
+                                    if(i==0)
+                                    {
+                                        first_team_id = player.value("PTeam").toInt();
+                                        ++team_1_p_count;
+                                    }
+                                    else
+                                        if(first_team_id==player.value("PTeam").toInt())
+                                            ++team_1_p_count;
+                                        else
+                                            ++team_2_p_count;
+                                    int apm = 0;
+                                    if(player.value("PName")==sender_name)
+                                        apm = average_apm;
+                                    else apm = 0;
+                                    _game_info->add_player(player.value("PName").toString(), player.value("PRace").toString(),
+                                                           player.value("PTeam").toInt(), player.value("PFnlState").toInt(), apm/*rep_reader->GetAverageAPM(i)*/);
+
+
+                                }
+                                else
+                                {
+
+                                    qDebug() << "Player does not contain players info";
+                                    return 0;
+                                }
+                            }
+                            else
+                            {
+                                qDebug() << "Player is not Human";
+                                return 0;
+                            }
+                        }
+                        else
+                        {
+                            qDebug() << "Player does not contain PHuman";
+                            return 0;
+                        }
+                    }
+                    else
+                    {
+                        qDebug() << "GSGameStats does not contain" << player_id;
+                        return 0;
+                    }
+                }
+            }
+            else
+            {
+                qDebug() << "Game options is not standart";
+                return 0;
+            }
+//            QString str = rep_reader->RenameReplay();
+//            qDebug() << str;
+//            playback.close();
+
+//            if(playback.rename(str+".rec"))
+//                qDebug() << "Rep file renamed successfully";
+//            else
+//                qDebug() << "Error while rename rep file";
+
+
+            if(team_1_p_count==team_2_p_count)
+                _game_info->set_type(team_1_p_count);
+            else
+//                _game_info->set_type(4);
+            {
+                qDebug() << "invalid game type";
+            }
         }
         else
         {
@@ -242,7 +349,7 @@ GameInfo *GameInfoReader::get_game_info(QString profile)
         qDebug() << "testStats.lua does not contain GSGameStats";
         return 0;
     }
-    file.close();
+
 
     if(_game_info!=0)
         return _game_info;
@@ -268,9 +375,6 @@ QString GameInfoReader::get_sender_name(bool init/*=false*/)
         steam_path = settings_second.value("SteamPath").toString();
     }
 
-//    char *s = getenv("ProgramFiles(x86)");
-//    QString str(s);
-//    qDebug() << str;
     if(userdata_dir.cd(steam_path + "/userdata"))
     {
         if(userdata_dir.entryInfoList().size()>2)
@@ -280,7 +384,6 @@ QString GameInfoReader::get_sender_name(bool init/*=false*/)
             {
                 if(name!="."&&name!="..")
                 {
-//                    qDebug() << name;
                     userdata_dir.cd(name);
                     if(userdata_dir.entryList().contains("9450"))
                     {
@@ -291,41 +394,41 @@ QString GameInfoReader::get_sender_name(bool init/*=false*/)
                 }
             }
             qDebug() << "Steam ID associated with Soulstorm:" << account_id32_str;
-//            return QString(account_id32_str);
             if(!account_id32_str.isNull())
             {
                 account_id32 = account_id32_str.toInt();
-    //            account_id32 = userdata_dir.entryInfoList().at(2).fileName().toInt();
                 quint64 account_id64 = 76561197960265728 + account_id32;
 
                 QString steam_id64 = QString::number(account_id64);
                 if(_game_info!=0) _game_info->set_steam_id(steam_id64);
                 Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=" + QLatin1String(STEAM_API_KEY) + "&steamids="+steam_id64+"&format=json");
-//                qDebug() << "0";
-//                qDebug() << sender.get(request);
                 QVariantMap player_info = QtJson::json_to_map(sender.get(request));
-//                qDebug() << "0.5";
                 if(player_info.contains("response"))
                 {
-//                    qDebug() << "2";
+                    qDebug() << "response";
                     QVariantMap response = player_info.value("response").toMap();
                     if(response.contains("players"))
                     {
-//                        qDebug() << "3";
+                        qDebug() << "players";
                         QVariantList players = response.value("players").toList();
                         if(!players.isEmpty())
                             if(players.at(0).toMap().contains("personaname"))
                             {
-//                                qDebug() << "4";
+                                qDebug() << "personaname";
                                 player_name = players.at(0).toMap().value("personaname").toString();
                                 if(init)
                                 {
-//                                    QByteArray btr = player_name.toAscii();
-//                                    QString hex_name(btr.toHex());
-                                    QString hex_name = player_name;
+                                    qDebug() << "init";
+                                    qDebug() << player_name;
+                                    QByteArray btr = player_name.toUtf8();
+                                    QString hex_name(btr.toHex());
+
                                     Request request_to_server("http://tpmodstat.16mb.com/regplayer.php?name="+hex_name+"&sid="+steam_id64+"&key="+QLatin1String(SERVER_KEY));
-//                                    qDebug() << "request_to_server";
-                                    if(sender.get(request_to_server).isNull())
+                                    QByteArray response_fromstat = sender.get(request_to_server);
+
+                                    QString r_str = QString::fromUtf8(response_fromstat.data());
+                                    qDebug() << r_str;
+                                    if(response_fromstat.isNull())
                                         qDebug() << "Server returned empty data";
                                     return QString("initialization");
                                 }
@@ -369,65 +472,101 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
     QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\thq\\dawn of war - soulstorm\\", QSettings::NativeFormat);
 
     QString ss_path =  settings.value("installlocation").toString();
-    QString out;
+    QString out="";
 
     QFile file(ss_path+"/warnings.log");
 
     // запишем время первой попытки открытия warnings.log
     QTime time = QTime::currentTime();
+//    qDebug() << "open warning log";
     while(!file.open(QIODevice::ReadOnly))
     {
-        qDebug() << "Could not open warnings.log";
         // если с первого раза лог не котрылася попробуем через 1 секунду пока не откроется
         // если через 10 секунд лог открыть не удалось, то вернем пустую строку
         if(QTime::currentTime().toString("s").toInt() - time.toString("s").toInt()>10)
+        {
+            qDebug() << "Could not open warnings.log";
             return QString();
+        }
     }
 
     QTextStream textStream(&file);
-//    qDebug() << str;
-    while (!textStream.atEnd())
+
+    QString str_stop = "Game Stop";
+    QString str_start = "Game Start";
+    QString str_playback = "Game Playback";
+    bool stop = false;
+    int state_offset = -3;
+    qDebug() << "find string";
+    QStringList fileLines = textStream.readAll().split("\n");
+    int counter = fileLines.size();
+    while (counter!=0)
     {
-        QString line = textStream.readLine();
-
-//        int index;
-
-//        qDebug() << line;
+//        qDebug() << "read next line" << counter-1;
+        // читаем следующую строку из файла
+        QString line = fileLines.at(counter-1);
+        // если текущаю строка содержит переданную в параметрах строку
         if(line.contains(str, Qt::CaseInsensitive))
         {
+            // результат поиска
             out="";
+            // удаляем запятые из прочитанной строки
             line = line.remove(',');
+            // получаем список строк разделив текущую строку по пробелам
             QStringList list = line.split(" ");
-            list.removeAll("");
+            list.removeAll(""); // удаляем пустые строки из списка
+            list.removeAll("\n"); // удаляем переводы строк
+            list.removeAll("\r");
             // если строка сложная, то есть содержит более одного слова через пробел
             // то получим первое слово в строке и прорим по нему
+            // если переданная строка содержит пробелы,
+            QString first_word;
             if(str.contains(" ", Qt::CaseInsensitive))
-                str = str.split(" ")[0];
-            if(list.contains(str, Qt::CaseInsensitive))
+                // делим переданную строку через пробел, получаем первый элемент списка
+                // к примеру если передали Game Start, то получим Game
+                first_word = str.split(" ")[0];
+
+            // если в списке полученном из текущей строки есть искомое слово
+            if(list.contains(first_word, Qt::CaseInsensitive))
             {
-                out = list[list.indexOf(str)+offset];
-//                qDebug() << out;
+                // пишем в вывод строку из списка с отступом, переданном в параметре
+                if(list.indexOf(first_word, Qt::CaseInsensitive)!=-1)
+                    out = list[list.indexOf(first_word, Qt::CaseInsensitive)+offset];
+                else
+                    qDebug() << "out of range" << first_word << counter-1;
             }
-//            index = line.indexOf(str);
-//            qDebug() << line;
-//            qDebug() << 4 << index;
-//    //        if(file.right(12).left(2).toInt()>temp_filename.right(12).left(2).toInt())
-//            for(int i=index; i<line.length(); ++i)
-//                if(line.at(i)==' ')
-//                {
-//                    ++i;
-//                    line.split(' ');
-//                    while((!line.at(i).isNull()) ))
-//                    {
-//                        qDebug() << line.at(i);
-//                        out += line.at(i);
-////                        qDebug() << out;
-//                        ++i;
-//                    }
-//                    break;
-//                }
-            break;
         }
+        if(!stop&&(line.contains(str_stop , Qt::CaseInsensitive)||
+           line.contains(str_start, Qt::CaseInsensitive)||
+           line.contains(str_playback, Qt::CaseInsensitive)))
+        {
+            // удаляем запятые из прочитанной строки
+            line = line.remove(',');
+            // получаем список строк разделив текущую строку по пробелам
+            QStringList list = line.split(" ");
+            list.removeAll(""); // удаляем пустые строки из списка
+            list.removeAll("\n"); // удаляем переводы строк
+            list.removeAll("\r");
+
+            if(list.contains("Game", Qt::CaseInsensitive))
+            {
+                if(list.indexOf("Game", Qt::CaseInsensitive)!=-1)
+                {
+                    if(list.at(4).contains("Stop", Qt::CaseInsensitive))
+                        last_stopgame = QTime::fromString(list[list.indexOf("Game", Qt::CaseInsensitive)+state_offset], "hh:mm:ss.z");
+                    if(list.at(4).contains("Start", Qt::CaseInsensitive))
+                    {
+                        last_startgame = QTime::fromString(list[list.indexOf("Game", Qt::CaseInsensitive)+state_offset], "hh:mm:ss.z");
+                        stop = true;
+                    }
+                    if(list.at(4).contains("Playback", Qt::CaseInsensitive))
+                        last_playback = QTime::fromString(list[list.indexOf("Game", Qt::CaseInsensitive)+state_offset], "hh:mm:ss.z");
+                }
+                else
+                    qDebug() << "out of range" << "Game" << counter-1;;
+            }
+        }
+        --counter;
     }
     file.close();
     return out;

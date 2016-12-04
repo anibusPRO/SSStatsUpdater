@@ -1,4 +1,5 @@
 #include "logger.h"
+#include <QDebug>
 
 // Типы сообщений
 static const char* msgType[] =
@@ -31,23 +32,23 @@ void customMessageHandler(QtMsgType type, const char* msg)
     std::cout << msgType[type] << msg << std::endl;
     if(logStream && logStream->device())
     {
-        *logStream << msgType[type] << msg << endl;
+        *logStream << msgType[type] << QString::fromLocal8Bit(msg) << endl;
     }
 }
 
 void logger::installLog()
 {
     logFile = new QFile("stats.log");
-    if(logFile->open(QFile::WriteOnly | QIODevice::WriteOnly | QIODevice::Unbuffered))
+    if(logFile->open(QIODevice::WriteOnly | QIODevice::Unbuffered))
     logStream = new QTextStream(logFile);
 
-    #ifdef Q_WS_WIN
+//    #ifdef Q_WS_WIN
 //    logStream->setCodec("Windows-1251");
     logStream->setCodec("utf-8");
     // Под остальными ОС - utf8
-    #else
-    logStream->setCodec("utf-8");
-    #endif
+//    #else
+//    logStream->setCodec("utf-8");
+//    #endif
 
     // Запись заголовка с информацией о запуске
     if(logStream && logStream->device())

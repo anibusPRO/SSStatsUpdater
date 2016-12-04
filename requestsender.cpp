@@ -71,7 +71,7 @@ namespace Network
         manager->setProxy(_proxy);
 
         QNetworkReply* reply = getRequest ? manager->get(request.request()) :
-                                            manager->post(request.request(false), request.data());
+                                            manager->post(request.request(false), request.data(false));
 
 #if defined(NETWORK_SHOW_SEND_REQUESTS)
         if (getRequest)
@@ -111,8 +111,8 @@ namespace Network
 
     QByteArray RequestSender::sendWhileSuccess(Request& request, int maxCount /*= 2*/, bool getRequest /*= true*/)
     {
-        if (maxCount < 0)
-            throw QString(__LINE__ + " " __FILE__);
+//        if (maxCount < 0)
+//            throw QString(__LINE__ + " " __FILE__);
 
         int c = 0;
         QByteArray answer;

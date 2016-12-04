@@ -1,16 +1,20 @@
 #ifndef STATSCOLLECTOR_H
 #define STATSCOLLECTOR_H
 
+//# define NETWORK_SHOW_SEND_REQUESTS
+
 #include "requestsender.h"
 #include "gameinforeader.h"
 #include "gameinfo.h"
 #include "logger.h"
+#include "apmmeter.h"
 #include <QCoreApplication>
 
 using namespace Network;
 
-class StatsCollector
+class StatsCollector : public QObject
 {
+    Q_OBJECT
 public:
     StatsCollector();
     ~StatsCollector();
@@ -25,12 +29,12 @@ public:
     bool stop=false;
 
 private:
-    QCoreApplication * app;
-
+    QCoreApplication *app;
+    APMMeter *apm_meter;
     // получает путь до игры из реестра windows
     QString get_soulstorm_installlocation();
     // отправляет статистику взятую из файлв testStats.lua в папке path_to_profile
-    bool send_stats(QString path_to_profile);
+    bool send_stats(QString path_to_profile, QString path_to_playback);
     // инициализирует игрока на сервере путем отправки steam_id игрока
     bool init_player();
 
@@ -38,7 +42,8 @@ private:
     GameInfoReader reader;
     logger log;
     RequestSender sender;
-
+signals:
+    void start_meter();
 };
 
 #endif // STATSCOLLECTOR_H
