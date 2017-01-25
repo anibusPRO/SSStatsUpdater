@@ -35,7 +35,7 @@ public:
 
     QString ResolvedResourceSpeed;
 
-    LanguageService getLS() const;
+//    LanguageService getLS() const;
 
     QString getResolvedAIDiff() const;
 
@@ -53,10 +53,10 @@ public:
 
     QString getResolvedPositions() const;
 
-    bool isStandart();
+    bool isStandart(int game_type);
 
-private:
-    LanguageService LS;
+//private:
+//    LanguageService LS;
 
 };
 

@@ -23,14 +23,14 @@ public:
 
     int PlayerId;
 
-    short PlayerNumber;
-    short PlayerNumber2;
+    qint16 PlayerNumber;
+    qint16 PlayerNumber2;
 
-    short PlayerActionNumber;
+    qint16 PlayerActionNumber;
 
-    short ActionType;
+    qint16 ActionType;
 
-    short Value;
+    qint16 Value;
 
     char *AdditionalInfo;
     QByteArray ActionData2;

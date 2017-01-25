@@ -42,6 +42,8 @@ namespace Network
         qint64 _maxWaitTime;
         RequestError _error;
         QNetworkProxy _proxy;
+    public slots:
+        void progress(qint64 bytesSent, qint64 bytesTotal);
     };
 }
 

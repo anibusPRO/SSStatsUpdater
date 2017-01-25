@@ -18,6 +18,7 @@ public:
     long getAverageAPM();
     long getCurrentAPM();
     long getMaxAPM();
+    long getTime();
 
     APMLogger* logger;
     HINSTANCE hinstAPMSharedDll;

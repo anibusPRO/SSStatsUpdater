@@ -21,7 +21,7 @@ qint16 ExtendedBinReader::ReadInt16()
     this->readRawData(temp, count);
     buffer.append(temp, count);
     delete[] temp;
-    return (short)((quint8)(buffer[0] & 0xFF) | (quint8)(buffer[1] << 8));
+    return (qint16)(((quint8)buffer[0]&0xFF) | ((quint8)buffer[1] << 8));
 }
 
 qint32 ExtendedBinReader::ReadInt32()
@@ -32,7 +32,7 @@ qint32 ExtendedBinReader::ReadInt32()
     this->readRawData(temp, count);
     buffer.append(temp, count);
     delete[] temp;
-    return (int)(((quint8)buffer[0]&0xFF) | ((quint8)buffer.at(1)<<8) | ((quint8)buffer[2]<<16) | ((quint8)buffer[3]<<24));
+    return (int)(((quint8)buffer[0]&0xFF) | ((quint8)buffer[1]<<8) | ((quint8)buffer[2]<<16) | ((quint8)buffer[3]<<24));
 }
 
 qint64 ExtendedBinReader::ReadInt64()

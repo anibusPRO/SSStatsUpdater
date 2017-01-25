@@ -32,7 +32,7 @@ void customMessageHandler(QtMsgType type, const char* msg)
     std::cout << msgType[type] << msg << std::endl;
     if(logStream && logStream->device())
     {
-        *logStream << msgType[type] << QString::fromLocal8Bit(msg) << endl;
+        *logStream << msgType[type] << QDateTime::currentDateTime().toString("hh:mm:ss.zzz ") << QString::fromLocal8Bit(msg) << endl;
     }
 }
 

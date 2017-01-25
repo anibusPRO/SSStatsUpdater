@@ -5,7 +5,9 @@
 #include <QNetworkReply>
 #include <QDebug>
 #include <QThread>
+#include <QDateTime>
 #include "requestsender.h"
+#include <windows.h>
 
 namespace Network
 {
@@ -62,6 +64,7 @@ namespace Network
 
     QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true*/)
     {
+//        qDebug() << "sendRequest function";
         QTimer timer;
         timer.setInterval(_maxWaitTime);
         timer.setSingleShot(true);
@@ -69,10 +72,17 @@ namespace Network
         QEventLoop loop;
         QSharedPointer<QNetworkAccessManager> manager(new QNetworkAccessManager);
         manager->setProxy(_proxy);
+        QNetworkRequest req;
 
-        QNetworkReply* reply = getRequest ? manager->get(request.request()) :
-                                            manager->post(request.request(false), request.data(false));
-
+        if(getRequest)
+            req = request.request();
+        else
+            req = request.request(getRequest);
+//        qDebug() << "prepare to send complite";
+//        qDebug() << "send replay:" << getRequest;
+        QNetworkReply* reply = getRequest ? manager->get(req) :
+                                            manager->post(req, request.data(getRequest));
+//        qDebug() << "send finished";
 #if defined(NETWORK_SHOW_SEND_REQUESTS)
         if (getRequest)
             qDebug() << "[GET] " <<  request.request().url().toString();
@@ -82,7 +92,16 @@ namespace Network
 
 //        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
 //        QObject::connect(&timer, &QTimer::timeout, reply, &QNetworkReply::abort);
+
         QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+        if (getRequest)
+            QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), &timer, SLOT(start()));
+        else
+        {
+            QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), &timer, SLOT(start()));
+            QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(progress(qint64,qint64)));
+        }
+
         QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
 
         timer.start();
@@ -99,6 +118,8 @@ namespace Network
         {
             _error = RequestSender::TimeoutError;
         }
+        if(_error!=NoError)
+            qDebug() << "TimeoutError";
 
         reply->deleteLater();
 
@@ -126,10 +147,16 @@ namespace Network
                 break;
 
             qDebug() << "Ошибка при отправке запроса. Код ошибки - " << error() << ". Повторная отправка запроса через 2 секунды\n";
-            QThread::currentThread()->msleep(2000);
+//            QThread::currentThread()->msleep(2000);
+            Sleep(2000);
         }
 
         return answer;
+    }
+
+    void RequestSender::progress(qint64 bytesSent, qint64 bytesTotal)
+    {
+        qDebug() << "uploading progress:" << (double)bytesSent*100/(double)bytesTotal <<"%";
     }
 
 }

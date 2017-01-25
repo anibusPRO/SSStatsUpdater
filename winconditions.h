@@ -47,7 +47,7 @@ public:
 
     bool hasGameTimer;
 
-    bool isStandart();
+    bool isStandart(int game_type);
     void debug();
 };
 

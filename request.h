@@ -16,7 +16,7 @@ namespace Network
 
         QString address() const;
         void setAddress(QString address);
-        void setFile(QByteArray ar);
+        bool setFile(QByteArray data, QString type, QString name, QString content);
         void addParam(QString name, QVariant value);
         bool removeParam(QString name);
 
@@ -28,7 +28,12 @@ namespace Network
         QByteArray data(bool forGetRequest = true) const;
 
     private:
-        QByteArray playback;
+
+        QByteArray paramFileType;
+        QByteArray paramFileName;
+        QByteArray paramContentType;
+        QByteArray paramData;
+
         QByteArray dataToSend; // byte array to be sent in POST
         QString _address;
         QMap<QString, QString> _params;

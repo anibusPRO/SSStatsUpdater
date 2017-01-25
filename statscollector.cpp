@@ -16,8 +16,8 @@ StatsCollector::StatsCollector()
     QTextCodec::setCodecForCStrings(QTextCodec::codecForName("utf-8"));
 
     log.installLog();
-    sender.setMaxWaitTime(10000);
-
+//    sender.setMaxWaitTime(10000);
+    server_addr = "http://www.dowstats.h1n.ru";
 }
 
 StatsCollector::~StatsCollector()
@@ -79,125 +79,288 @@ QString StatsCollector::get_soulstorm_installlocation()
 void StatsCollector::start()
 {
 
+
+    // файл конфигураций
+    QSettings settings("stats.ini", QSettings::IniFormat);
+
+    // получаем из файла конфигураций данные о размере буфера
+    bool onlyinit = settings.value("settings/onlyinit", false).toBool();
+    bool enablestats = settings.value("settings/enablestats", true).toBool();
+    bool apmmeter = settings.value("settings/apmmeter", true).toBool();
+    version = settings.value("info/version", "0.0.0").toString();
+    server_addr = settings.value("settings/serveraddr", "http://www.tpmodstat.16mb.com").toString();
+    reader.set_server_addr(server_addr);
+    qDebug() << "stats version:" << version;
+    qDebug() << "server address:" << server_addr;
+    if(!enablestats)
+    {
+        qDebug() << "stats is disabled";
+        return;
+    }
+
+//    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY) + "&";
+//    Request request(url);
+//    RequestSender sender;
+//    int local_version = settings.value("info/updater_version", "0.0.0").toString().remove(".").toInt();
+//    int global_version = QString::fromUtf8(sender.get(request).data()).toInt();
+//    bool success = true;
+//    QString filename="SSStatsUpdater.dll";
+//    if(global_version>local_version||!QFile::exists(filename))
+//    {
+//        request.setAddress(url+"&name="+filename+"&");
+//        QByteArray btar = sender.get(request);
+//        qDebug() << filename;
+//        QFile cur_file(filename);
+//        qDebug() << "remove updater:" << QFile::remove(filename);
+//        if(cur_file.open(QIODevice::WriteOnly))
+//        {
+//            cur_file.write(btar);
+//            cur_file.close();
+//        }
+//        else
+//            success = false;
+//    }
+//    if(success)
+//        settings.setValue("settings/enablestats", 1);
+//    else
+//    {
+//        settings.setValue("settings/enablestats", 0);
+//        qDebug() << "updating error";
+//    }
+
     if(!init_player())
     {
         qDebug() << "problems with player initialization";
         return;
     }
+    if(onlyinit)
+    {
+        qDebug() << "onlyinit";
+        return;
+    }
 
     QString ss_path =  get_soulstorm_installlocation();
-    QDir temp_dir(ss_path);
 
-    qDebug() << temp_dir.path();
-    _cur_profile = reader.get_cur_profile_dir(ss_path);
-    // если не удалось получить имя текущего профиля, то используем по умолчанию первый профиль
-    if(_cur_profile=="") _cur_profile = "Profile1";
-    QString path_to_profile = ss_path +"/Profiles/"+ _cur_profile;
-    QString path_to_playback = ss_path +"/Playback/";
-    QFileInfo info(path_to_profile +"/testStats.lua");
-
-    qDebug() << "check testStats.lua exists";
-    QDateTime old_time;
-    QDateTime time;
-    while(!info.exists())
+    if(ss_path.right(1)=="\\")
     {
-        info.refresh();
-        QThread::currentThread()->msleep(5000);
+        ss_path = ss_path.left(ss_path.length()-1);
+        ss_path.replace("\\","/");
     }
-    old_time = info.lastModified();
+
+    reader.set_ss_path(ss_path);
+
+    QString path_to_profile = reader.get_cur_profile_dir(true);
+    QString path_to_playback = ss_path +"/Playback/";
+    QFileInfo TSinfo(path_to_profile +"/testStats.lua");
+    qDebug() << "path_to_profile:" << path_to_profile;
+
+    QDateTime old_time, time;
+    if(!TSinfo.exists())
+    {
+        qDebug() << "testStats.lua does not exitsts";
+//        QFile temp(path_to_profile +"/testStats.lua");
+//        temp.open(QIODevice::WriteOnly);
+//        temp.write("new file");
+//        temp.close();
+    }
+
+    TSinfo.refresh();
+    old_time = TSinfo.lastModified();
 
     qDebug() << "create thread for apm meter";
     QThread* thread = new QThread;
     apm_meter = new APMMeter();
     apm_meter->moveToThread(thread);
-//    QObject::connect(thread, SIGNAL(started()), apm_meter, SLOT(start()));
+
     QObject::connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
     QObject::connect(this, SIGNAL(start_meter()), apm_meter, SLOT(start()));
-    thread->start();
 
+    if(apmmeter)
+        thread->start();
+    else
+        delete thread;
 
-//    QThread::currentThread()->msleep(5000);
+    qDebug() << "start";
+    QString cur_profile;
+    int n=0;
     while(!stop)
     {
-        int apm;
-//        qDebug() << "start";
-//        apm_meter->start();
 
-        info.refresh();
-        time = info.lastModified();
-//        qDebug() << "check info updates";
+        TSinfo.refresh();
+        time = TSinfo.lastModified();
+
+        // если время последнего изменения файла больше предыдущего
         if(time > old_time)
         {
-            apm = apm_meter->getAverageAPM();
-            qDebug() << "Current:" << apm_meter->getCurrentAPM() << "Average:" << apm << "Max:" << apm_meter->getMaxAPM();
-            if(!reader.isPlayback()/*&&!reader.isGameGoing()*/)
-            {
-//                qDebug() << "game is not playback and not going";
-                reader.setAverageAPM(apm_meter->getAverageAPM());
-                if(send_stats(path_to_profile, path_to_playback))
-                    qDebug() << "Match results sent";
-                else
-                    qDebug() << "Match results were not sent";
-                apm_meter->stop();
-                qDebug() << "stop meter";
-            }
-            else
-            {
-                /* going or*/
-                qDebug() << "Current game is playback";
-            }
-//                apm_meter->start();
-//                if(!thread->isRunning()) thread->start();
+            qDebug() << TSinfo.filePath();
+            qDebug() << "Current:" << apm_meter->getCurrentAPM() << "Average:" << apm_meter->getAverageAPM() << "Max:" << apm_meter->getMaxAPM() << "Time:" << apm_meter->getTime();
+
+            // ждем секунду чтобы в файле warnings.log записалось
+            // Game Stop, иначе счетчик апм попытается запуститься вновь
+            // подождем завершения игры
 
 
+
+            // то если игра не плейбэк можно отправлять статистику
+            // однако, может быть так что игра не плейбэк
+            // но после Game Start еще нет Game Stop, поэтому нужно вызжать время
+//            Sleep(3000);
+            switch (reader.readySend())
+            {
+                // если рузультат вызова 0, то это означает что игра завершилась и она не реплей
+                case 0:
+                    reader.setAverageAPM(apm_meter->getAverageAPM());
+
+                    if(send_stats(path_to_profile, path_to_playback))
+                        qDebug() << "Match results sent";
+                    else
+                        qDebug() << "Match results were not sent";
+
+                    apm_meter->stop();
+                    qDebug() << "stop meter";
+
+                    break;
+                // игра не завершилась
+                case 1:
+                    qDebug() << "Current game is still in progress";
+                    // если игра идет и счетчик apm не запущен, то запустим его
+                    if(apm_meter->stop_flag)
+                    {
+                        qDebug() << "start meter";
+                        emit start_meter();
+                    }
+                    // ждем пока игра не закончится
+                    while(reader.readySend()!=0)
+                        Sleep(10000);
+                    break;
+                // игра - просмотр реплея
+                case 2:
+                    qDebug() << "Current game is playback";
+                    break;
+                default:
+                    break;
+            }
             old_time = time;
+        }
 
-            if(apm_meter->stop_flag&&reader.isGameGoing())
+        // проверяем не изменился ли профиль игрока
+        if(n%3==0)
+        {
+            cur_profile = reader.get_cur_profile_dir();
+            if(!cur_profile.isNull()&&path_to_profile != cur_profile)
             {
-                qDebug() << "start meter";
-                emit start_meter();
+                path_to_profile = cur_profile;
+                TSinfo.setFile(path_to_profile + "/testStats.lua");
+                old_time = TSinfo.lastModified();
+                qDebug() << "path_to_profile:" << path_to_profile;
             }
         }
-//        qDebug() << apm_meter->stop_flag << reader.isGameGoing();
 
-//        apm = apm_meter->getAverageAPM();
-//        qDebug() << "VOT ONO! VOT ONO ZNACHENIE APM:" << apm << apm_meter->getCurrentAPM();
+        // отправку лог файлов и проверку на профиль сделаем реже
+        if(n%6==0)
+        {
+            send_logfile();
+            n = 0;
+        }
 
-        QThread::currentThread()->msleep(10000);
+        Sleep(10000);
+        ++n;
+
+        // если пользователь переключится на другой профиль, то
+        // дата последнего изменения файла testStats.lua будет меньше,
+        // чем последнего old_time, если на текущем профиле были игры
+        // иначе, если игр не было то может быть так что time будет больше old_time
     }
     apm_meter->stop();
 }
 
-bool StatsCollector::send_stats(QString path_to_profile, QString path_to_playback)
+bool StatsCollector::send_logfile()
 {
-    info = reader.get_game_info(path_to_profile, path_to_playback);
+    QStringList files;
+    files.append("stats.log");
+    files.append("warnings.log");
+    files.append("update.log");
 
-    if(info!=0)
+    QString steamid = reader.get_steam_id();
+    bool result;
+    for(int i=0; i<3; ++i)
     {
-        QString url = info->get_url(server_addr);
-//        qDebug() << url;
-        if(!url.isNull())
+        QFile log(files.at(i));
+        result = log.open(QIODevice::ReadOnly);
+        if(result)
         {
+            QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&version="+version.remove(".")+"&type="+QString::number(i);
             Request request(url);
-//            QFile playback(path_to_playback+"temp.rec");
-//            if(!playback.open(QIODevice::ReadWrite))
-//            {
-//                qDebug() << "Could not open temp.rec";
-//                return 0;
-//            }
-            request.setFile(reader.get_playback_file());
-
-//            if(sender.get(request).isNull())
-//                qDebug() << "Server returned empty data";
-
-            qDebug() << "Ответ от сервера:" << QString::fromUtf8(sender.post(request).data());
-//            playback->close();
-//            delete playback;
+            request.setFile(log.readAll(),
+                            "logfile",
+                            steamid+".log",
+                            "text/txt");
+            sender.post(request);
+            log.close();
         }
     }
-    else
-        return false;
-    return true;
+
+//    bool result = stats_log.open(QIODevice::ReadOnly);
+//    if(result)
+//    {
+////        qDebug() << "отправка лога на сервер 2";
+//        QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&ver="+version.remove(".")+"&";
+//        Request request(url);
+//        request.setFile(stats_log.readAll(),
+//                        "logfile",
+//                        steamid+".log",
+//                        "text/txt");
+//        sender.post(request);
+////        qDebug() << "send log file";
+////        qDebug() << "Лог файл отправлен:" << QString::fromUtf8(sender.post(request).data());
+
+//        stats_log.close();
+//    }
+//    bool result_w = warnings_log.open(QIODevice::ReadOnly);
+//    if(result_w)
+//    {
+//        QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&ver="+version.remove(".")+"&type=1";
+//        Request request(url);
+//        request.setFile(warnings_log.readAll(),
+//                        "logfile",
+//                        steamid+".log",
+//                        "text/txt");
+//        sender.post(request);
+//        warnings_log.close();
+//    }
+//    bool result_u = update_log.open(QIODevice::ReadOnly);
+//    if(result_u)
+//    {
+//        QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&ver="+version.remove(".")+"&type=2";
+//        Request request(url);
+//        request.setFile(update_log.readAll(),
+//                        "logfile",
+//                        steamid+".log",
+//                        "text/txt");
+//        sender.post(request);
+//        update_log.close();
+//    }
+    return result;
+}
+
+bool StatsCollector::send_stats(QString path_to_profile, QString path_to_playback)
+{
+    QString url = reader.get_url(path_to_profile, path_to_playback);
+
+    if(!url.isNull()&&url!="")
+    {
+        qDebug() << url;
+        Request request(url);
+        if(request.setFile(reader.get_playback_file(),
+                        "replay",
+                        "temp.rec",
+                        "application/octet-stream"))
+            qDebug() << "Ответ от сервера:\n" << QString::fromUtf8(sender.postWhileSuccess(request).data());
+        else
+            qDebug() << "Ответ от сервера:\n" << QString::fromUtf8(sender.getWhileSuccess(request).data());
+        return true;
+    }
+    return false;
 }
 
 

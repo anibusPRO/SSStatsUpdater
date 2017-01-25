@@ -32,9 +32,15 @@ namespace Network
         _address = address;
     }
 
-    void Request::setFile(QByteArray ar)
+    bool Request::setFile(QByteArray data,QString type,QString name,QString content)
     {
-        playback = ar;
+        if(data==0)
+            return false;
+        paramFileType=type.toUtf8();
+        paramFileName=name.toUtf8();
+        paramContentType=content.toUtf8();
+        paramData=data;
+        return true;
     }
 
     void Request::addParam(QString name, QVariant value)
@@ -80,38 +86,38 @@ namespace Network
 
         if (!forGetRequest)
         {
-            qDebug() << "file size:" << playback.size();
-            QByteArray param1Name="param1" ,param1Value="value1";
-            QByteArray param2Name="replay", param2FileName="temp.rec",
-                param2ContentType="application/octet-stream", param2Data=playback;
+//            qDebug() << "file size:" << playback.size();
+//            QByteArray param1Name="param1" ,param1Value="value1";
+//            QByteArray paramFileType="replay", paramFileName="temp.rec",
+//                paramContentType="application/octet-stream", paramData=playback;
 
             //задаем разделитель
             QByteArray postData, boundary="1BEF0A57BE110FD467A";
-            //первый параметр
-            postData.append("--"+boundary+"\r\n");//разделитель
-            //имя параметра
-            postData.append("Content-Disposition: form-data; name=\"");
-            postData.append(param1Name);
-            postData.append("\"\r\n\r\n");
-            //значение параметра
-            postData.append(param1Value);
-            postData.append("\r\n");
+//            //первый параметр
+//            postData.append("--"+boundary+"\r\n");//разделитель
+//            //имя параметра
+//            postData.append("Content-Disposition: form-data; name=\"");
+//            postData.append(param1Name);
+//            postData.append("\"\r\n\r\n");
+//            //значение параметра
+//            postData.append(param1Value);
+//            postData.append("\r\n");
 
             //параметр 2 - файл
             postData.append("--"+boundary+"\r\n");//разделитель
             //имя параметра
             postData.append("Content-Disposition: form-data; name=\"");
-            postData.append(param2Name);
+            postData.append(paramFileType);
             //имя файла
             postData.append("\"; filename=\"");
-            postData.append(param2FileName);
+            postData.append(paramFileName);
             postData.append("\"\r\n");
             //тип содержимого файла
-            postData.append("Content-Type: "+param2ContentType+"\r\n");
+            postData.append("Content-Type: "+paramContentType+"\r\n");
             //передаем в base64
             postData.append("Content-Transfer-Encoding: binary\r\n\r\n");
             //данные
-            postData.append(param2Data);
+            postData.append(paramData);
             postData.append("\r\n");
             //"хвост" запроса
             postData.append("--"+boundary+"--\r\n");
@@ -119,16 +125,18 @@ namespace Network
 
             r.setHeader(QNetworkRequest::ContentTypeHeader,"multipart/form-data; boundary="+boundary);
             r.setHeader(QNetworkRequest::ContentLengthHeader,QByteArray::number(postData.length()));
+//            qDebug() << "postData size:" << postData.length();
             dataToSend = postData;
+//            qDebug() << "dataToSenda size 1:" << dataToSend.size();
         }
-
+//        qDebug() << "postData size 2:" << dataToSend.size();
 
         return r;
     }
 
     QByteArray Request::data(bool forGetRequest /*= true*/) const
     {
-        qDebug() << "forGetRequest" << forGetRequest;
+//        qDebug() << "forGetRequest" << forGetRequest;
         if(forGetRequest)
         {
             auto b = _params.begin();
@@ -149,7 +157,11 @@ namespace Network
             byteArrayData.chop(1);
             return byteArrayData;
         }
-        else return dataToSend;
+        else
+        {
+//            qDebug() << "dataToSend" << dataToSend.size();
+            return dataToSend;
+        }
 
     }
 

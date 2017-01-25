@@ -20,11 +20,9 @@ public:
     ~StatsCollector();
     void start();
 
-    // для хранения адреса сервера
-    QString server_addr;
     // для хранения текущего активного профиля
     // имя папки профиля можно узнать так же из файла Local.ini
-    QString _cur_profile;
+//    QString _cur_profile;
     // флаг опредляющий выполнение основного цикла работы программы
     bool stop=false;
 
@@ -35,13 +33,17 @@ private:
     QString get_soulstorm_installlocation();
     // отправляет статистику взятую из файлв testStats.lua в папке path_to_profile
     bool send_stats(QString path_to_profile, QString path_to_playback);
+    bool send_logfile();
     // инициализирует игрока на сервере путем отправки steam_id игрока
     bool init_player();
 
-    GameInfo *info;
+//    GameInfo *info;
     GameInfoReader reader;
     logger log;
     RequestSender sender;
+    // для хранения адреса сервера
+    QString server_addr;
+    QString version;
 signals:
     void start_meter();
 };

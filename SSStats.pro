@@ -5,12 +5,33 @@
 #-------------------------------------------------
 
 QT       += core network
-QT       += gui
+QT       -= gui
+
 QMAKE_CXXFLAGS += -std=c++11
+
 CONFIG -= console
 
-TARGET = SSStats
 TEMPLATE = lib
+CONFIG += dll
+
+
+TARGET = SSStats
+
+
+#static { # everything below takes effect with CONFIG ''= static
+# CONFIG += static
+# CONFIG += staticlib # this is needed if you create a static library, not a static executable
+# DEFINES+= STATIC
+# message("~~~ static build ~~~") # this is for information, that the static build is done
+# mac: TARGET = $$join(TARGET,,,_static) #this adds an _static in the end, so you can seperate static build from non static build
+# win32: TARGET = $$join(TARGET,,,s) #this adds an s in the end, so you can seperate static build from non static build
+#}
+
+#CONFIG (debug, debug|release) {
+# mac: TARGET = $$join(TARGET,,,_debug)
+# win32: TARGET = $$join(TARGET,,,d)
+#}
+
 
 DEFINES += SSSTATS_LIBRARY
 
@@ -28,7 +49,7 @@ SOURCES +=     main.cpp \
     gamesettings.cpp \
     repreader.cpp \
     extendedbinreader.cpp \
-    languageservice.cpp \
+#    languageservice.cpp \
     apmmeter.cpp
 #ssstats.cpp \
 
@@ -46,7 +67,7 @@ HEADERS += request.h \
     gamesettings.h \
     repreader.h \
     extendedbinreader.h \
-    languageservice.h \
+#    languageservice.h \
     apmmeter.h
 #ssstats.h\
 #        ssstats_global.h \
@@ -73,6 +94,10 @@ HEADERS +=    APMShared/APMConfig.h \
 #SOURCES +=
 
 #HEADERS += \
+INCLUDEPATH += C:/Qt/qt-static/include
+
+LIBS        +=        -L"c:/Qt/qt-static/lib" -lQtNetwork -lQtCore -lole32 -luuid -lws2_32 -ladvapi32 -lshell32 -luser32 -lkernel32 -lz
 
 
-!contains(DEFINES, HAVE_QT5)    include(qt_json/qt_json.pri)
+include(qt_json/qt_json.pri)
+#!contains(DEFINES, HAVE_QT5)

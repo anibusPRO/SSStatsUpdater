@@ -18,7 +18,7 @@ public:
 
     QString RenameReplay();
     QString RenameReplay(Replay *rep);
-    bool isStandart();
+    bool isStandart(int game_type);
     int GetAverageAPM(int id);
 
     Replay *getReplay() const;

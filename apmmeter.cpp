@@ -94,7 +94,7 @@ void APMMeter::mainCycle()
     }
 
     timerId = SetTimer(NULL, 0, MEASURE_CYCLE_LENGTH-10, NULL);
-    qDebug() << "mainCycle";
+    qDebug() << "meter started";
     max = 0;
     MSG msg = {0};
     while(!stop_flag)
@@ -134,6 +134,7 @@ void APMMeter::mainCycle()
 
         DispatchMessage(&msg);
     }
+    qDebug() << "meter stopped";
     KillTimer(NULL, timerId);
 
     UnhookWindowsHookEx(keyboardHook);
@@ -151,6 +152,15 @@ void APMMeter::stop()
 {
     stop_flag = true;
     measure->resetAllAPM();
+}
+
+long APMMeter::getTime()
+{
+//    APMLoggableSnapshot snap = measure->getSnapshot();
+//    qDebug() << snap.snap.actions;
+//    qDebug() << snap.snap.time;
+//    qDebug() << snap.snap.apm;
+    return measure->getTime();
 }
 
 long APMMeter::getAverageAPM()

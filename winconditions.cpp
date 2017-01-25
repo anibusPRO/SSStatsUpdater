@@ -3,7 +3,11 @@
 
 WinConditions::WinConditions()
 {
-
+    hasAnnihilate       = true;
+    hasDestroyHQ        = false;
+    hasEconomicVictory  = false;
+    hasSuddenDeath      = false;
+    hasAssassinate      = false;
 }
 
 WinConditions::~WinConditions()
@@ -11,15 +15,15 @@ WinConditions::~WinConditions()
 
 }
 
-bool WinConditions::isStandart()
+bool WinConditions::isStandart(int game_type)
 {
+    if(!hasAnnihilate)
+        return false;
     if(hasDestroyHQ)
         return false;
     if(hasEconomicVictory)
         return false;
     if(hasSuddenDeath)
-        return false;
-    if(!hasAnnihilate)
         return false;
     if(hasAssassinate)
         return false;

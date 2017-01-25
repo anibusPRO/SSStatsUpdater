@@ -8,6 +8,7 @@
 #include "repreader.h"
 #include <QTime>
 #include "gameinfo.h"
+#include <QStringList>
 
 #ifdef HAVE_QT5
 #   include <QJsonDocument>
@@ -26,16 +27,20 @@ public:
     GameInfoReader();
     ~GameInfoReader();
 
-    GameInfo *get_game_info(QString profile, QString path_to_playback);
+    QString get_url(QString profile, QString path_to_playback);
+    int get_game_info(QString profile, QString path_to_playback);
     QString get_sender_name(bool init=false);
     QString read_warnings_log(QString str, int offset=0);
-    QString get_cur_profile_dir(QString path);
+    QString get_cur_profile_dir(bool fstart=false);
     QByteArray get_playback_file();
 
     void setAverageAPM(int apm);
-    bool isPlayback();
-    bool isGameGoing();
+//    bool isPlayback();
+//    bool isGameGoing();
+    int readySend();
     bool timeCompare(QTime t1, QTime t2);
+    int timeDifference(QTime t1, QTime t2);
+    bool tempRecExist();
     QTime last_playback;
     QTime last_startgame;
     QTime last_stopgame;
@@ -67,11 +72,22 @@ public:
 //        return QtJson::serialize(map).replace("\n", "");
 //    #endif
 //    }
+
+    void set_ss_path(const QString &value);
+    QString get_steam_id();
+    void set_server_addr(QString addr);
+
 private:
+    QString server_addr;
     GameInfo *_game_info;
+    QString cur_profile_name;
+    QString ss_path;
+    QStringList errors_list;
     //  ридер реплеев
-    RepReader *rep_reader;
+//    RepReader *rep_reader;
     QByteArray _playback;
+    QString steam_id64;
+    int error_code;
 
 };
 
