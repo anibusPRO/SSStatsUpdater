@@ -53,7 +53,7 @@ void GameInfo::set_type(int type)
     _type = type;
 }
 
-void GameInfo::setApmR(int apm)
+void GameInfo::setAPMR(int apm)
 {
     apmR = apm;
 }
@@ -102,8 +102,6 @@ QString GameInfo::get_steam_id()
 
 QString GameInfo::get_url(QString site_addr)
 {
-    bool sender_is_player = false;
-
     // добавим имена игроков
     for(int i=0; i<_players_count; ++i)
     {
@@ -119,18 +117,8 @@ QString GameInfo::get_url(QString site_addr)
 //                + QString::number(_players.at(i).apm) + "&";
 
         // записываем реальный apm для игрока который отправляет статистику
-        if(!sender_is_player&&_sender_name==_players.at(i).name)
-        {
+        if(_sender_name==_players.at(i).name)
             site_addr += "apm" +QString::number(i+1)+"r"+"=" + QString::number(apmR) + "&";
-            sender_is_player = true;
-        }
-    }
-
-    // если отправитель не игрок, то не будем отправлять статистику
-    if(!sender_is_player)
-    {
-        qDebug() << "The sender is not a player";
-        return QString("");
     }
 
     // добавим расы игроков

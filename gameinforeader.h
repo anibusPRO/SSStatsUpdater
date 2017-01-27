@@ -29,7 +29,7 @@ public:
 
     QString get_url(QString profile, QString path_to_playback);
     int get_game_info(QString profile, QString path_to_playback);
-    QString get_sender_name(bool init=false);
+    QStringList get_sender_name(bool init=false);
     QString read_warnings_log(QString str, int offset=0);
     QString get_cur_profile_dir(bool fstart=false);
     QByteArray get_playback_file();
@@ -86,7 +86,7 @@ private:
     //  ридер реплеев
 //    RepReader *rep_reader;
     QByteArray _playback;
-    QString steam_id64;
+    QStringList steam_id64;
     int error_code;
 
 };

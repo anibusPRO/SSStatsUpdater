@@ -33,7 +33,8 @@ GameInfoReader::GameInfoReader()
                   "Player is not human"<<
                   "Player does not contain players info"<<
                   "Unsupported type of game. Number of players per team is not equal."<<
-                  "game options is not standart";
+                  "game options is not standart"<<
+                  "sender is not player";
 }
 
 GameInfoReader::~GameInfoReader()
@@ -287,11 +288,8 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
             else
                 return 7;
 
-            QString sender_name = get_sender_name();
-
-            if(!sender_name.isNull())
-                _game_info->set_sender_name(sender_name);
-            else
+            QStringList sender_names = get_sender_name();
+            if(sender_names.isNull())
             {
                 qDebug() << "sender name is null";
                 return error_code;
@@ -304,10 +302,12 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 
             // добавим название последнего запущенного мода к информации об игре
             _game_info->set_mod_name(mod_name);
-
+//            QStringList players;
             // если настройки игры стандартные, то отправим статистику
             int team_1_p_count=0, team_2_p_count=0, first_team_id=0;
             int fnl_state, sender_id;
+            QString p_name;
+            bool sender_is_player = false;
             for(int i=0; i<players_count;++i)
             {
                 QString player_id = "player_"+QString::number(i);
@@ -332,11 +332,15 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                                     else
                                         ++team_2_p_count;
 
-                                if(player.value("PName")==sender_name)
+                                p_name = player.value("PName").toString();
+                                if(sender_names.contains(p_name))
                                 {
-                                    _game_info->setApmR(average_apm);
+                                    _game_info->set_sender_name(p_name);
+                                    _game_info->setAPMR(average_apm);
+                                    _game_info->set_steam_id(steam_id64.at(sender_names.indexOf(p_name)));
                                     fnl_state = player.value("PFnlState").toInt();
                                     sender_id = i;
+                                    sender_is_player = true;
                                 }
                                 else
                                     if((_game_info->get_winby()=="disconnect")&&(players_count==2))
@@ -344,7 +348,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                                     else
                                         fnl_state = player.value("PFnlState").toInt();
 
-                                _game_info->add_player(player.value("PName").toString(), player.value("PRace").toString(),
+                                _game_info->add_player(p_name, player.value("PRace").toString(),
                                                            player.value("PTeam").toInt(), fnl_state/*, rep_reader.GetAverageAPM(i)*/);
                             }
                             else
@@ -362,6 +366,10 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                     return 17;
                 }
             }
+
+            if(!sender_is_player)
+                return 23;
+
 //            if(playback.rename(str+".rec"))
 //                qDebug() << "Rep file renamed successfully";
 //            else
@@ -437,12 +445,12 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
     return 0;
 }
 
-QString GameInfoReader::get_sender_name(bool init/*=false*/)
+QStringList GameInfoReader::get_sender_name(bool init/*=false*/)
 {
     RequestSender sender;
 //    sender.setMaxWaitTime(10000);
     QString player_name;
-
+    QStringList retList;
     uint account_id32;
     QString account_id32_str;
     QDir userdata_dir(QCoreApplication::applicationDirPath());
@@ -469,66 +477,65 @@ QString GameInfoReader::get_sender_name(bool init/*=false*/)
                     if(userdata_dir.entryList().contains("9450"))
                     {
                         account_id32_str = name;
-                        break;
+                        account_id32 = account_id32_str.toInt();
+                        quint64 account_id64 = 76561197960265728 + account_id32;
+                        QString account_id64_str = QString::number(account_id64);
+                        qDebug() << "Steam ID associated with Soulstorm:" << account_id64 << account_id32;
+
+
+                        Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=" + QLatin1String(STEAM_API_KEY) + "&steamids="+account_id64_str+"&format=json");
+
+                        QVariantMap player_info = QtJson::json_to_map(sender.getWhileSuccess(request));
+                        if(player_info.contains("response"))
+                        {
+                            QVariantMap response = player_info.value("response").toMap();
+                            if(response.contains("players"))
+                            {
+                                QVariantList players = response.value("players").toList();
+                                if(!players.isEmpty())
+                                    if(players.at(0).toMap().contains("personaname"))
+                                    {
+                                        player_name = players.at(0).toMap().value("personaname").toString();
+
+                                        if(init)
+                                        {
+                                            qDebug() << "Steam nickname:" << player_name;
+                                            QByteArray btr = player_name.toUtf8();
+                                            QString hex_name(btr.toHex());
+                                            qDebug() << server_addr;
+                                            Request request_to_server(server_addr+"/regplayer.php?name="+hex_name+"&sid="+account_id64_str+"&key="+QLatin1String(SERVER_KEY));
+                                            QByteArray response_fromstat = sender.getWhileSuccess(request_to_server);
+
+                                            QString r_str = QString::fromUtf8(response_fromstat.data());
+                                            qDebug() << "registration in dowstats: " << r_str;
+                                            if(response_fromstat.isNull())
+                                                qDebug() << "Server returned empty data";
+
+                                            retList << "initialization";
+                                            return retList;
+                                        }
+                                        else
+                                        {
+                                            // если мы получили имя игрока, то запишем steam id этого игрока
+                                            retList << player_name;
+                                            steam_id64 << account_id64_str;
+                                            return retList;
+                                        }
+                                    }
+                                    else
+                                        error_code = 15;
+                                else
+                                    error_code = 14;
+                            }
+                            else
+                                error_code = 13;
+                        }
+                        else
+                            error_code = 12;
                     }
                     userdata_dir.cdUp();
                 }
             }
-            qDebug() << "Steam ID associated with Soulstorm:" << account_id32_str;
-            if(!account_id32_str.isNull())
-            {
-                account_id32 = account_id32_str.toInt();
-                quint64 account_id64 = 76561197960265728 + account_id32;
-
-                steam_id64 = QString::number(account_id64);
-                if(_game_info!=0) _game_info->set_steam_id(steam_id64);
-                Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=" + QLatin1String(STEAM_API_KEY) + "&steamids="+steam_id64+"&format=json");
-                QVariantMap player_info = QtJson::json_to_map(sender.getWhileSuccess(request));
-                if(player_info.contains("response"))
-                {
-//                    qDebug() << "response";
-                    QVariantMap response = player_info.value("response").toMap();
-                    if(response.contains("players"))
-                    {
-//                        qDebug() << "players";
-                        QVariantList players = response.value("players").toList();
-                        if(!players.isEmpty())
-                            if(players.at(0).toMap().contains("personaname"))
-                            {
-//                                qDebug() << "personaname";
-                                player_name = players.at(0).toMap().value("personaname").toString();
-                                if(init)
-                                {
-//                                    qDebug() << "init";
-                                    qDebug() << "Steam nickname:" << player_name;
-                                    QByteArray btr = player_name.toUtf8();
-                                    QString hex_name(btr.toHex());
-                                    qDebug() << server_addr;
-                                    Request request_to_server(server_addr+"/regplayer.php?name="+hex_name+"&sid="+steam_id64+"&key="+QLatin1String(SERVER_KEY));
-                                    QByteArray response_fromstat = sender.getWhileSuccess(request_to_server);
-
-                                    QString r_str = QString::fromUtf8(response_fromstat.data());
-                                    qDebug() << "registration in dowstats: " << r_str;
-                                    if(response_fromstat.isNull())
-                                        qDebug() << "Server returned empty data";
-                                    return QString("initialization");
-                                }
-                                else
-                                    return player_name;
-                            }
-                            else
-                                error_code = 15;
-                        else
-                            error_code = 14;
-                    }
-                    else
-                        error_code = 13;
-                }
-                else
-                    error_code = 12;
-            }
-            else
-                error_code = 11;
         }
         else
             error_code = 10;
@@ -537,7 +544,7 @@ QString GameInfoReader::get_sender_name(bool init/*=false*/)
         error_code = 9;
 
     qDebug() << "could not change work dir";
-    return QString();
+    return QStringList();
 }
 
 QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
