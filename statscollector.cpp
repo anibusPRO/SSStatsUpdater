@@ -367,10 +367,11 @@ bool StatsCollector::send_stats(QString path_to_profile, QString path_to_playbac
 bool StatsCollector::init_player()
 {
     qDebug() << "Player initialization";
-    if(!reader.get_sender_name(true).isNull())
+    if(!reader.get_sender_name(true).isEmpty())
     {
         qDebug() << "Player successfully initialized";
         return true;
     }
+    qDebug() << "Player initialization failed";
     return false;
 }

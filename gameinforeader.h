@@ -44,6 +44,7 @@ public:
     QTime last_playback;
     QTime last_startgame;
     QTime last_stopgame;
+    bool stopgame_valid;
     int average_apm;
 
 //    inline QVariantMap to_map(QByteArray array)

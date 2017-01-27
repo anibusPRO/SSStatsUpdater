@@ -35,6 +35,7 @@ GameInfoReader::GameInfoReader()
                   "Unsupported type of game. Number of players per team is not equal."<<
                   "game options is not standart"<<
                   "sender is not player";
+    stopgame_valid = false;
 }
 
 GameInfoReader::~GameInfoReader()
@@ -45,6 +46,9 @@ GameInfoReader::~GameInfoReader()
 // возвращает true если первое время больше второго иначе false
 bool GameInfoReader::timeCompare(QTime t1, QTime t2)
 {
+    // счетчик апм не включался из-за того что время начала игры было 23 часа
+    // а время конца не было инициализировано и так как оно по умолчанию равно 0 часов
+    // то программа решила что оно больше и попыталось завершить игру
     if(t1.hour()==23&&t2.hour()<=3)
         return false;
     return t1>t2;
@@ -72,7 +76,7 @@ void GameInfoReader::set_ss_path(const QString &value)
 
 QString GameInfoReader::get_steam_id()
 {
-    return steam_id64;
+    return steam_id64.at(0);
 }
 
 void GameInfoReader::set_server_addr(QString addr)
@@ -95,7 +99,7 @@ int GameInfoReader::readySend()
     int diff = timeDifference(last_playback, last_startgame);
     if(diff<1)
         return 2;
-    if(timeCompare(last_startgame, last_stopgame))
+    if(!stopgame_valid||timeCompare(last_startgame, last_stopgame))
         return 1;
     return 0;
 }
@@ -289,7 +293,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                 return 7;
 
             QStringList sender_names = get_sender_name();
-            if(sender_names.isNull())
+            if(sender_names.isEmpty())
             {
                 qDebug() << "sender name is null";
                 return error_code;
@@ -496,7 +500,7 @@ QStringList GameInfoReader::get_sender_name(bool init/*=false*/)
                                     if(players.at(0).toMap().contains("personaname"))
                                     {
                                         player_name = players.at(0).toMap().value("personaname").toString();
-
+                                        steam_id64 << account_id64_str;
                                         if(init)
                                         {
                                             qDebug() << "Steam nickname:" << player_name;
@@ -518,7 +522,6 @@ QStringList GameInfoReader::get_sender_name(bool init/*=false*/)
                                         {
                                             // если мы получили имя игрока, то запишем steam id этого игрока
                                             retList << player_name;
-                                            steam_id64 << account_id64_str;
                                             return retList;
                                         }
                                     }
@@ -643,7 +646,10 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
                 if(index!=-1)
                 {
                     if(list.at(4).contains("Stop", Qt::CaseInsensitive))
+                    {
                         last_stopgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
+                        stopgame_valid = true;
+                    }
                     if(list.at(4).contains("Start", Qt::CaseInsensitive))
                     {
                         last_startgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
