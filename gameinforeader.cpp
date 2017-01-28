@@ -5,6 +5,7 @@
 #include <QVariantList>
 #include <QCoreApplication>
 #include <QSettings>
+#include <windows.h>
 
 using namespace Network;
 
@@ -15,7 +16,7 @@ GameInfoReader::GameInfoReader()
                   "could not open 'testStats.lua'"<<
                   "testStats.lua is not readable"<<
                   "stats file does not contain 'GSGameStats'"<<
-                  "GSGameStats does not contain 'WinBy'"
+                  "GSGameStats does not contain 'WinBy'"<<
                   "GSGameStats does not contain 'Duration'"<<
                   "the current game is still in progress"<<
                   "GSGameStats does not contain 'Teams'"<<
@@ -46,9 +47,6 @@ GameInfoReader::~GameInfoReader()
 // возвращает true если первое время больше второго иначе false
 bool GameInfoReader::timeCompare(QTime t1, QTime t2)
 {
-    // счетчик апм не включался из-за того что время начала игры было 23 часа
-    // а время конца не было инициализировано и так как оно по умолчанию равно 0 часов
-    // то программа решила что оно больше и попыталось завершить игру
     if(t1.hour()==23&&t2.hour()<=3)
         return false;
     return t1>t2;
@@ -56,7 +54,8 @@ bool GameInfoReader::timeCompare(QTime t1, QTime t2)
 // возвращает разницу в минутах между двумя аргументами
 int GameInfoReader::timeDifference(QTime t1, QTime t2)
 {
-
+//    qDebug() << t1.hour() << t1.minute();
+//    qDebug() << t2.hour() << t2.minute();
     int h1=t1.hour(), h2=t2.hour();
     if(h1==23&&h2==0)
         h2 = 24;
@@ -64,7 +63,7 @@ int GameInfoReader::timeDifference(QTime t1, QTime t2)
         h1 = 24;
     int dhm = abs(h1 - h2);
     int m = h1>h2 ? (t1.minute() - t2.minute()):(t2.minute() - t1.minute());
-    int minutes = abs(dhm*60 + m);
+    int minutes = abs(dhm*60 - m);
 
     return minutes;
 }
@@ -95,9 +94,14 @@ void GameInfoReader::set_server_addr(QString addr)
 
 int GameInfoReader::readySend()
 {
-    read_warnings_log("APP -- Game Start", -1);
+//    last_playback = QTime::fromString(read_warnings_log("APP -- Game Playback", -1), "hh:mm:ss.z");
+    read_warnings_log("APP -- Game Stop", -1);
+    qDebug() << last_playback.toString("hh:mm:ss.z")  << "Playback";
+    qDebug() << last_startgame.toString("hh:mm:ss.z") << "Start";
+    qDebug() << last_stopgame.toString("hh:mm:ss.z")  << "Stop";
     int diff = timeDifference(last_playback, last_startgame);
-    if(diff<1)
+
+    if(diff<=1)
         return 2;
     if(!stopgame_valid||timeCompare(last_startgame, last_stopgame))
         return 1;
@@ -124,15 +128,23 @@ QString GameInfoReader::get_cur_profile_dir(bool fstart)
 
     QString name;
     name = read_warnings_log("Using player profile", 3);
+    int n=0;
+    while(n<5&&name=="")
+    {
+        name = read_warnings_log("Using player profile", 3);
+        Sleep(5000);
+        n++;
+    }
     if(fstart)
         qDebug() << "cur profile name:" << name << cur_profile_name;
+    QString profile = "Profile1";
 
     // если имя профиля не изменилось, то отправим пустую строку, как знак того что профиль не сменился
     if(name==cur_profile_name)
-        return QString();
+        return QString(ss_path +"/Profiles/"+ profile);
 
     QStringList profiles = temp_dir.entryList();
-    QString profile;
+
     if(!profiles.isEmpty())
         foreach (QString file, profiles)
         {
@@ -193,7 +205,10 @@ void GameInfoReader::setAverageAPM(int apm)
 QString GameInfoReader::get_url(QString profile, QString path_to_playback)
 {
     int e_code = get_game_info(profile, path_to_playback);
-    qDebug() << errors_list.at(e_code);
+    if(e_code<errors_list.size())
+        qDebug() << errors_list.at(e_code);
+    else
+        qDebug() << "error code is da biggest";
     if(e_code==0)
     {
         QString url;
@@ -204,6 +219,8 @@ QString GameInfoReader::get_url(QString profile, QString path_to_playback)
         }
         return url;
     }
+    if(e_code>=5)
+        delete _game_info;
     return QString();
 }
 
@@ -370,7 +387,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                     return 17;
                 }
             }
-
+            qDebug() << "debug 1";
             if(!sender_is_player)
                 return 23;
 
@@ -378,11 +395,12 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 //                qDebug() << "Rep file renamed successfully";
 //            else
 //                qDebug() << "Error while rename rep file";
+            qDebug() << "debug 2";
             if(team_1_p_count==team_2_p_count)
                 _game_info->set_type(team_1_p_count);
             else
                 return 21;
-
+            qDebug() << "debug 3";
             if(_game_info->get_winby()=="disconnect")
             {
                 if(team_1_p_count==1)
@@ -406,7 +424,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                     }
             }
 
-
+            qDebug() << "debug 4";
             _playback = 0;
             RepReader rep_reader;
             if(!tempRecExist())
@@ -596,11 +614,11 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
         // читаем следующую строку из файла
         QString line = fileLines.at(counter);
         // если текущаю строка содержит переданную в параметрах строку
-        if(line.contains(str, Qt::CaseInsensitive))
+        if(line.contains(str/*, Qt::CaseInsensitive*/))
         {
             // результат поиска
             out="";
-
+//            qDebug() << str;
             // удаляем запятые из прочитанной строки
             line = line.remove(',');
             line = line.remove("\n");
@@ -613,49 +631,50 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
             // то получим первое слово в строке и прорим по нему
             // если переданная строка содержит пробелы,
             QString first_word;
-            if(str.contains(" ", Qt::CaseInsensitive))
+            if(str.contains(" "))
                 // делим переданную строку через пробел, получаем первый элемент списка
                 // к примеру если передали Game Start, то получим Game
                 first_word = str.split(" ")[0];
-
+//            foreach(QString word, list)
+//                qDebug() << word;
+//            qDebug() << first_word;
             // если в списке полученном из текущей строки есть искомое слово
-            if(list.contains(first_word, Qt::CaseInsensitive))
+            if(list.contains(first_word/*, Qt::CaseInsensitive*/))
             {
                 // пишем в вывод строку из списка с отступом, переданном в параметре
-                if(list.indexOf(first_word, Qt::CaseInsensitive)!=-1)
-                    out = list[list.indexOf(first_word, Qt::CaseInsensitive)+offset];
+                if(list.indexOf(first_word/*, Qt::CaseInsensitive*/)!=-1)
+                    out = list[list.indexOf(first_word/*, Qt::CaseInsensitive*/)+offset];
                 else
                     qDebug() << "out of range" << first_word << str << counter;
             }
         }
-        if(!fstate&&(line.contains(str_stop , Qt::CaseInsensitive)||
-           line.contains(str_start, Qt::CaseInsensitive)||
-           line.contains(str_playback, Qt::CaseInsensitive)))
+        if(!fstate&&(line.contains(str_stop/* , Qt::CaseInsensitive*/)||
+           line.contains(str_start/*, Qt::CaseInsensitive*/)||
+           line.contains(str_playback/*, Qt::CaseInsensitive*/)))
         {
             line = line.remove(',');
             line = line.remove("\n");
             line = line.remove("\r");
-            qDebug() << line;
+
             QStringList list = line.split(" ");
             list.removeAll("");
 
-            if(list.contains("Game", Qt::CaseInsensitive))
+            if(list.contains("Game"/*, Qt::CaseInsensitive*/))
             {
-                int index = list.indexOf("Game", Qt::CaseInsensitive);
+                int index = list.indexOf("Game"/*, Qt::CaseInsensitive*/);
 
                 if(index!=-1)
                 {
-                    if(list.at(4).contains("Stop", Qt::CaseInsensitive))
+                    if(list.at(4).contains("Stop"/*, Qt::CaseInsensitive*/))
                     {
                         last_stopgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
                         stopgame_valid = true;
-                    }
-                    if(list.at(4).contains("Start", Qt::CaseInsensitive))
-                    {
-                        last_startgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
                         fstate = true;
                     }
-                    if(list.at(4).contains("Playback", Qt::CaseInsensitive))
+                    if(list.at(4).contains("Start"/*, Qt::CaseInsensitive*/))
+                        last_startgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
+
+                    if(list.at(4).contains("Playback"/*, Qt::CaseInsensitive*/))
                         last_playback = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
                 }
                 else
@@ -684,7 +703,10 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
 //        }
         // если искомое слово найдено, то можно завершать цикл
         if(out!="")
+        {
+//            qDebug() << out;
             break;
+        }
 
         --counter;
     }

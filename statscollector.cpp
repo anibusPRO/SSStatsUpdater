@@ -188,7 +188,7 @@ void StatsCollector::start()
 
         TSinfo.refresh();
         time = TSinfo.lastModified();
-
+//        qDebug() << time.toString("dd.MM.yyyy hh:mm:ss.z") << old_time.toString("dd.MM.yyyy hh:mm:ss.z");
         // если время последнего изменения файла больше предыдущего
         if(time > old_time)
         {
@@ -230,12 +230,13 @@ void StatsCollector::start()
                         emit start_meter();
                     }
                     // ждем пока игра не закончится
-                    while(reader.readySend()!=0)
+                    while(reader.readySend()==1)
                         Sleep(10000);
                     break;
                 // игра - просмотр реплея
                 case 2:
                     qDebug() << "Current game is playback";
+                    apm_meter->stop();
                     break;
                 default:
                     break;
