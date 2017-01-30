@@ -272,19 +272,23 @@ void StatsCollector::start()
         // чем последнего old_time, если на текущем профиле были игры
         // иначе, если игр не было то может быть так что time будет больше old_time
     }
-    apm_meter->stop();
+    if(thread->isRunning())
+    {
+        apm_meter->stop();
+        thread->wait();
+    }
 }
 
 bool StatsCollector::send_logfile()
 {
     QStringList files;
-    files.append("stats.log");
-    files.append("warnings.log");
-    files.append("update.log");
+    files << "stats.log" <<
+             "warnings.log";
+//             "update.log";
 
     QString steamid = reader.get_steam_id();
     bool result;
-    for(int i=0; i<3; ++i)
+    for(int i=0; i<2; ++i)
     {
         QFile log(files.at(i));
         result = log.open(QIODevice::ReadOnly);
@@ -300,47 +304,6 @@ bool StatsCollector::send_logfile()
             log.close();
         }
     }
-
-//    bool result = stats_log.open(QIODevice::ReadOnly);
-//    if(result)
-//    {
-////        qDebug() << "отправка лога на сервер 2";
-//        QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&ver="+version.remove(".")+"&";
-//        Request request(url);
-//        request.setFile(stats_log.readAll(),
-//                        "logfile",
-//                        steamid+".log",
-//                        "text/txt");
-//        sender.post(request);
-////        qDebug() << "send log file";
-////        qDebug() << "Лог файл отправлен:" << QString::fromUtf8(sender.post(request).data());
-
-//        stats_log.close();
-//    }
-//    bool result_w = warnings_log.open(QIODevice::ReadOnly);
-//    if(result_w)
-//    {
-//        QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&ver="+version.remove(".")+"&type=1";
-//        Request request(url);
-//        request.setFile(warnings_log.readAll(),
-//                        "logfile",
-//                        steamid+".log",
-//                        "text/txt");
-//        sender.post(request);
-//        warnings_log.close();
-//    }
-//    bool result_u = update_log.open(QIODevice::ReadOnly);
-//    if(result_u)
-//    {
-//        QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&ver="+version.remove(".")+"&type=2";
-//        Request request(url);
-//        request.setFile(update_log.readAll(),
-//                        "logfile",
-//                        steamid+".log",
-//                        "text/txt");
-//        sender.post(request);
-//        update_log.close();
-//    }
     return result;
 }
 

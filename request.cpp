@@ -34,7 +34,7 @@ namespace Network
 
     bool Request::setFile(QByteArray data,QString type,QString name,QString content)
     {
-        if(data==0)
+        if(data.isEmpty())
             return false;
         paramFileType=type.toUtf8();
         paramFileName=name.toUtf8();

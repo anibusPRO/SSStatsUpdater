@@ -118,7 +118,7 @@ int GameInfoReader::readySend()
 bool GameInfoReader::tempRecExist()
 {
     QString time = read_warnings_log("REC -- Error opening file playback:temp.rec for write", -1);
-    return last_startgame>QTime::fromString(time, "hh:mm:ss.z");
+    return timeCompare(last_startgame, QTime::fromString(time, "hh:mm:ss.z"));
 }
 
 
@@ -532,16 +532,10 @@ QStringList GameInfoReader::get_sender_name(bool init/*=false*/)
                                             qDebug() << "registration in dowstats: " << r_str;
                                             if(response_fromstat.isNull())
                                                 qDebug() << "Server returned empty data";
-
-                                            retList << "initialization";
-                                            return retList;
                                         }
                                         else
-                                        {
                                             // если мы получили имя игрока, то запишем steam id этого игрока
                                             retList << player_name;
-                                            return retList;
-                                        }
                                     }
                                     else
                                         error_code = 15;
@@ -563,9 +557,11 @@ QStringList GameInfoReader::get_sender_name(bool init/*=false*/)
     }
     else
         error_code = 9;
-
-    qDebug() << "could not change work dir";
-    return QStringList();
+    if(!init)
+        return retList;
+    return (QStringList() << "initialization");
+//    qDebug() << "could not change work dir";
+//    return QStringList();
 }
 
 QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/)
