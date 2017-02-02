@@ -149,7 +149,7 @@ void StatsCollector::start()
 
     reader.set_ss_path(ss_path);
 
-    QString path_to_profile = reader.get_cur_profile_dir(true);
+    QString path_to_profile = reader.get_cur_profile_dir();
     QString path_to_playback = ss_path +"/Playback/";
     QFileInfo TSinfo(path_to_profile +"/testStats.lua");
     qDebug() << "path_to_profile:" << path_to_profile;
@@ -248,7 +248,7 @@ void StatsCollector::start()
         if(n%3==0)
         {
             cur_profile = reader.get_cur_profile_dir();
-            if(!cur_profile.isNull()&&path_to_profile != cur_profile)
+            if((!cur_profile.isNull())&&path_to_profile != cur_profile)
             {
                 path_to_profile = cur_profile;
                 TSinfo.setFile(path_to_profile + "/testStats.lua");

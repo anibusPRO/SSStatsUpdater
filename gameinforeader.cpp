@@ -13,29 +13,30 @@ GameInfoReader::GameInfoReader()
 {
     _game_info = 0;
     errors_list <<"Stats processed without errors"<<
-                  "could not open 'testStats.lua'"<<
-                  "testStats.lua is not readable"<<
-                  "stats file does not contain 'GSGameStats'"<<
+                  "Could not open 'testStats.lua'"<<
+                  "'testStats.lua' is not readable"<<
+                  "Stats file does not contain 'GSGameStats'"<<
                   "GSGameStats does not contain 'WinBy'"<<
                   "GSGameStats does not contain 'Duration'"<<
-                  "the current game is still in progress"<<
+                  "Сurrent game is still in progress"<<
                   "GSGameStats does not contain 'Teams'"<<
                   "Unsupported type of game. The number of teams is not equals two."<<
-                  "userdata is not exists or is not readable"<<
-                  "userdata folder is empty"<<
-                  "account_id32_str is Null"<<
-                  "steam response does not contain response"<<
-                  "steam response does not contain players"<<
-                  "players list is empty"<<
-                  "steam response does not contain personaname"<<
-                  "could not open 'temp.rec'"<<
+                  "'userdata' is not exists or is not readable"<<
+                  "'userdata' folder is empty"<<
+                  "'account_id32_str' is Null"<<
+                  "Steam response does not contain response"<<
+                  "Steam response does not contain players"<<
+                  "Players list is empty"<<
+                  "Steam response does not contain personaname"<<
+                  "Could not open 'temp.rec'"<<
                   "GSGameStats does not contain player id"<<
                   "Player does not contain 'PHuman'"<<
                   "Player is not human"<<
                   "Player does not contain players info"<<
                   "Unsupported type of game. Number of players per team is not equal."<<
-                  "game options is not standart"<<
-                  "sender is not player";
+                  "Game options is not standart"<<
+                  "Sender is not player"<<
+                  "Winners count less than game type";
     stopgame_valid = false;
 }
 
@@ -84,14 +85,6 @@ void GameInfoReader::set_server_addr(QString addr)
 }
 
 
-//bool GameInfoReader::isGameGoing()
-//{
-
-////    if(last_startgame.isNull())
-//    read_warnings_log("APP -- Game Start", -1);
-//    return last_startgame>last_stopgame;
-//}
-
 int GameInfoReader::readySend()
 {
 //    last_playback = QTime::fromString(read_warnings_log("APP -- Game Playback", -1), "hh:mm:ss.z");
@@ -108,13 +101,6 @@ int GameInfoReader::readySend()
     return 0;
 }
 
-
-//bool GameInfoReader::isPlayback()
-//{
-//    read_warnings_log("APP -- Game Start", -1);
-//    return last_startgame<last_playback;
-//}
-
 bool GameInfoReader::tempRecExist()
 {
     QString time = read_warnings_log("REC -- Error opening file playback:temp.rec for write", -1);
@@ -122,7 +108,7 @@ bool GameInfoReader::tempRecExist()
 }
 
 
-QString GameInfoReader::get_cur_profile_dir(bool fstart)
+QString GameInfoReader::get_cur_profile_dir()
 {
     QDir temp_dir(ss_path+"/Profiles");
 
@@ -135,59 +121,69 @@ QString GameInfoReader::get_cur_profile_dir(bool fstart)
         Sleep(5000);
         n++;
     }
-    if(fstart)
-        qDebug() << "cur profile name:" << name << cur_profile_name;
     QString profile = "Profile1";
 
     // если имя профиля не изменилось, то отправим пустую строку, как знак того что профиль не сменился
-    if(name==cur_profile_name)
+    if(name.isEmpty())
         return QString(ss_path +"/Profiles/"+ profile);
+    if(name!=cur_profile_name)
+        qDebug() << "cur profile name:" << name << cur_profile_name;
 
     QStringList profiles = temp_dir.entryList();
+//    foreach (QString p, profiles)
+//        qDebug() << p;
 
     if(!profiles.isEmpty())
         foreach (QString file, profiles)
         {
             if(file!="."&&file!="..")
             {
-                temp_dir.cd(file);
-                QFile temp(temp_dir.path()+"/name.dat");
-                QString str="";
-                if (temp.open(QIODevice::ReadOnly))
+//                qDebug() << file;
+                if(QDir(temp_dir.path()+"/"+file).exists())
                 {
-                    QDataStream in(&temp);
-                    int filesize = temp.size()-3;
-                    char *bytes = new char[filesize];
-                    in.device()->seek(2);
-                    in.readRawData(bytes, filesize);
+                    if(temp_dir.cd(file))
+                    {
+                        QFile temp(temp_dir.path()+"/name.dat");
+                        QString str="";
+                        if (temp.open(QIODevice::ReadOnly))
+                        {
+                            QDataStream in(&temp);
+                            int filesize = temp.size()-3;
+                            char *bytes = new char[filesize];
+                            in.device()->seek(2);
+                            in.readRawData(bytes, filesize);
 
-                    str = QString::fromUtf16((ushort*)bytes).left(filesize/2);
+                            str = QString::fromUtf16((ushort*)bytes).left(filesize/2);
 
 
-                    temp.close();
-                    delete[] bytes;
+                            temp.close();
+                            delete[] bytes;
+                        }
+                        else
+                        {
+                            qDebug() << temp_dir.path() << file;
+                            qDebug() << "Could not open name.dat";
+                            temp_dir.cdUp();
+                            continue;
+                        }
+                        if(name == str)
+                        {
+                            profile = file;
+                            cur_profile_name = str;
+                            break;
+                        }
+                        else
+                            qDebug() << name << str;
+                        temp_dir.cdUp();
+                    }
+                    else
+                        qDebug() << "debug 2";
                 }
                 else
-                {
-                    qDebug() << temp_dir.path();
-                    qDebug() << "Could not open name.dat";
-                    temp_dir.cdUp();
-                    continue;
-                }
-                if(name == str)
-                {
-                    profile = file;
-                    cur_profile_name = str;
-                    break;
-                }
-                temp_dir.cdUp();
-
+                    qDebug() << "debug 1";
             }
         }
-
-    // если не удалось получить имя текущего профиля, то используем по умолчанию первый профиль
-    if(profile=="") profile = "Profile1";
-
+//    qDebug() << profile;
     return QString(ss_path +"/Profiles/"+ profile);
 
 }
@@ -326,7 +322,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 //            QStringList players;
             // если настройки игры стандартные, то отправим статистику
             int team_1_p_count=0, team_2_p_count=0, first_team_id=0;
-            int fnl_state, sender_id;
+            int fnl_state, sender_id, winners_count=0;
             QString p_name;
             bool sender_is_player = false;
             for(int i=0; i<players_count;++i)
@@ -368,7 +364,8 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                                         fnl_state = 5;
                                     else
                                         fnl_state = player.value("PFnlState").toInt();
-
+                                if(fnl_state==5)
+                                    winners_count++;
                                 _game_info->add_player(p_name, player.value("PRace").toString(),
                                                            player.value("PTeam").toInt(), fnl_state/*, rep_reader.GetAverageAPM(i)*/);
                             }
@@ -400,6 +397,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                 _game_info->set_type(team_1_p_count);
             else
                 return 21;
+
             qDebug() << "debug 3";
             if(_game_info->get_winby()=="disconnect")
             {
@@ -424,13 +422,17 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                     }
             }
 
+            if(winners_count!=team_1_p_count)
+                return 24;
+
             qDebug() << "debug 4";
-            _playback = 0;
-            RepReader rep_reader;
+            _playback.clear();
+
             if(!tempRecExist())
                 qDebug() << "REC -- Error opening file playback:temp.rec for write";
             else
             {
+                RepReader rep_reader;
                 qDebug() << "playback reading";
                 // откроем реплей файл последней игры для чтения
                 QFile pfile(path_to_playback+"temp.rec");
@@ -454,6 +456,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                 if(!rep_reader.isStandart(team_1_p_count))
                     return 22;
             }
+            qDebug() << "debug 5";
         }
         else
             return 4;
@@ -463,7 +466,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
         qDebug() << stats;
         return 3;
     }
-
+    qDebug() << "debug 6";
     return 0;
 }
 

@@ -31,12 +31,10 @@ public:
     int get_game_info(QString profile, QString path_to_playback);
     QStringList get_sender_name(bool init=false);
     QString read_warnings_log(QString str, int offset=0);
-    QString get_cur_profile_dir(bool fstart=false);
+    QString get_cur_profile_dir();
     QByteArray get_playback_file();
 
     void setAverageAPM(int apm);
-//    bool isPlayback();
-//    bool isGameGoing();
     int readySend();
     bool timeCompare(QTime t1, QTime t2);
     int timeDifference(QTime t1, QTime t2);
@@ -46,33 +44,6 @@ public:
     QTime last_stopgame;
     bool stopgame_valid;
     int average_apm;
-
-//    inline QVariantMap to_map(QByteArray array)
-//    {
-//    #ifdef HAVE_QT5
-//            return QJsonDocument::fromJson(array).toVariant().toMap();
-//    #else
-//            return QtJson::parse(array, "lua").toMap();
-//    #endif
-//    }
-//    inline QVariantMap json_to_map(QByteArray array)
-//    {
-//    #ifdef HAVE_QT5
-//            return QJsonDocument::fromJson(array).toVariant().toMap();
-//    #else
-//            return QtJson::parse(array, "json").toMap();
-//    #endif
-//    }
-
-//    /// Перевод из массива в строку типа JSON
-//    inline QByteArray map_to_json(QVariantMap map)
-//    {
-//    #ifdef HAVE_QT5
-//        return  QJsonDocument::fromVariant(map).toJson(QJsonDocument::Compact);
-//    #else
-//        return QtJson::serialize(map).replace("\n", "");
-//    #endif
-//    }
 
     void set_ss_path(const QString &value);
     QString get_steam_id();
@@ -84,8 +55,6 @@ private:
     QString cur_profile_name;
     QString ss_path;
     QStringList errors_list;
-    //  ридер реплеев
-//    RepReader *rep_reader;
     QByteArray _playback;
     QStringList steam_id64;
     int error_code;
