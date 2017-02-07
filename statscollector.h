@@ -36,7 +36,7 @@ private:
     bool send_logfile();
     // инициализирует игрока на сервере путем отправки steam_id игрока
     bool init_player();
-
+    int updateUpdater();
 //    GameInfo *info;
     GameInfoReader reader;
     logger log;

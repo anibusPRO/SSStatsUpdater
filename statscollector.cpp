@@ -6,6 +6,9 @@
 #include <QDir>
 #include <QSettings>
 #include <QObject>
+#include <fstream>
+#include <string>
+#include <iostream>
 
 StatsCollector::StatsCollector()
 {
@@ -98,27 +101,27 @@ void StatsCollector::start()
         return;
     }
 
-//    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY) + "&";
-//    Request request(url);
-//    RequestSender sender;
+    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY) + "&";
+    Request request(url);
+    RequestSender sender;
 //    int local_version = settings.value("info/updater_version", "0.0.0").toString().remove(".").toInt();
 //    int global_version = QString::fromUtf8(sender.get(request).data()).toInt();
-//    bool success = true;
-//    QString filename="SSStatsUpdater.dll";
+    bool success = true;
+    QString filename="SSStatsUpdater.dll";
 //    if(global_version>local_version||!QFile::exists(filename))
 //    {
-//        request.setAddress(url+"&name="+filename+"&");
-//        QByteArray btar = sender.get(request);
-//        qDebug() << filename;
-//        QFile cur_file(filename);
-//        qDebug() << "remove updater:" << QFile::remove(filename);
-//        if(cur_file.open(QIODevice::WriteOnly))
-//        {
-//            cur_file.write(btar);
-//            cur_file.close();
-//        }
-//        else
-//            success = false;
+    request.setAddress(url+"&name="+filename+"&");
+    QByteArray btar = sender.getWhileSuccess(request);
+    qDebug() << filename << "successfully downloaded";
+    QFile cur_file("SSStatsUpdaterTemp.dll");
+
+    if(cur_file.open(QIODevice::WriteOnly))
+    {
+        cur_file.write(btar);
+        cur_file.close();
+    }
+    else
+        success = false;
 //    }
 //    if(success)
 //        settings.setValue("settings/enablestats", 1);
@@ -127,6 +130,8 @@ void StatsCollector::start()
 //        settings.setValue("settings/enablestats", 0);
 //        qDebug() << "updating error";
 //    }
+        if(success)
+            updateUpdater();
 
     if(!init_player())
     {
@@ -231,7 +236,7 @@ void StatsCollector::start()
                     }
                     // ждем пока игра не закончится
                     while(reader.readySend()==1)
-                        Sleep(10000);
+                        Sleep(5000);
                     break;
                 // игра - просмотр реплея
                 case 2:
@@ -338,4 +343,41 @@ bool StatsCollector::init_player()
     }
     qDebug() << "Player initialization failed";
     return false;
+}
+
+int StatsCollector::updateUpdater()
+{
+    std::ofstream out("updater.bat");
+    out << "@echo off\n";
+    out << ":try\n";
+    out << "del SSStatsUpdater.dll\n";
+    out << "if exist SSStatsUpdater.dll goto try\n";
+    out << "ren SSStatsUpdaterTemp.dll SSStatsUpdater.dll\n";
+    out << "del updater.bat";
+    out.close();
+
+    PROCESS_INFORMATION pi;
+    STARTUPINFOA si;
+
+    ZeroMemory( &si, sizeof(si) );
+    ZeroMemory( &pi, sizeof(pi) );
+    si.cb = sizeof(si);
+    si.wShowWindow = SW_HIDE;
+    si.dwFlags = STARTF_USESHOWWINDOW;
+
+    QString pathexe = "C:\\Windows\\system32\\cmd.exe";
+    QString command = "cmd /c updater.bat";
+    DWORD iReturnVal = 0;
+    if(CreateProcessA((LPCSTR)pathexe.toStdString().c_str(), (LPSTR)command.toStdString().c_str(), NULL, NULL, false,
+    IDLE_PRIORITY_CLASS|CREATE_NO_WINDOW|CREATE_DEFAULT_ERROR_MODE|CREATE_NEW_CONSOLE/*|DETACHED_PROCESS*/, NULL, NULL, &si, &pi))
+    {
+        qDebug() << "process created";
+//        WaitForSingleObject(pi.hProcess, INFINITE);
+    }
+    else
+    {
+        iReturnVal = GetLastError();
+        qDebug() << "process was not created" << iReturnVal;
+    }
+    return iReturnVal;
 }

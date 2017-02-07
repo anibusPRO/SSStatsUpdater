@@ -1,6 +1,5 @@
 #include <windows.h>
 #include <thread>
-
 #include <iostream>
 
 #include "statscollector.h"

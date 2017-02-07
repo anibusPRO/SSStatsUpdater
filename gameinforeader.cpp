@@ -89,9 +89,9 @@ int GameInfoReader::readySend()
 {
 //    last_playback = QTime::fromString(read_warnings_log("APP -- Game Playback", -1), "hh:mm:ss.z");
     read_warnings_log("APP -- Game Stop", -1);
-    qDebug() << last_playback.toString("hh:mm:ss.z")  << "Playback";
-    qDebug() << last_startgame.toString("hh:mm:ss.z") << "Start";
-    qDebug() << last_stopgame.toString("hh:mm:ss.z")  << "Stop";
+//    qDebug() << last_playback.toString("hh:mm:ss.z")  << "Playback";
+//    qDebug() << last_startgame.toString("hh:mm:ss.z") << "Start";
+//    qDebug() << last_stopgame.toString("hh:mm:ss.z")  << "Stop";
     int diff = timeDifference(last_playback, last_startgame);
 
     if(diff<=1)
