@@ -34,9 +34,9 @@ private:
     // отправляет статистику взятую из файлв testStats.lua в папке path_to_profile
     bool send_stats(QString path_to_profile, QString path_to_playback);
     bool send_logfile();
-    // инициализирует игрока на сервере путем отправки steam_id игрока
-    bool init_player();
     int updateUpdater();
+    QString calcMD5(QString fileName);
+    QString calcMD5(QByteArray data);
 //    GameInfo *info;
     GameInfoReader reader;
     logger log;

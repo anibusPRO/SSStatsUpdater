@@ -68,6 +68,17 @@ int RepReader::GetAverageAPM(int id)
     return replay->GetPlayerMidApm(id);
 }
 
+// был случай, когда игрок находился в обсах, а другой игрок, с таким же ником был в слоте игрока
+// и тогда игрок из обса отправлял статистику, так как программа считала, что обс был в игре
+// поэтому решено проверять находился ли игрок с таким же ником в обсах
+bool RepReader::playerIsObserver(QString name)
+{
+    for(int i=0; i<this->replay->PlayerCount; ++i)
+        if(this->replay->Players.at(i)->Name==name&&this->replay->Players.at(i)->Type==4)
+            return true;
+    return false;
+}
+
 bool RepReader::ReadHeader(QDataStream *stream, QString fullFileName)
 {
     this->replay = new Replay(fullFileName);

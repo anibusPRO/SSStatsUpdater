@@ -64,7 +64,6 @@ namespace Network
 
     QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true*/)
     {
-//        qDebug() << "sendRequest function";
         QTimer timer;
         timer.setInterval(_maxWaitTime);
         timer.setSingleShot(true);
@@ -82,7 +81,7 @@ namespace Network
 //        qDebug() << "send replay:" << getRequest;
         QNetworkReply* reply = getRequest ? manager->get(req) :
                                             manager->post(req, request.data(getRequest));
-//        qDebug() << "send finished";
+        reply->ignoreSslErrors();
 #if defined(NETWORK_SHOW_SEND_REQUESTS)
         if (getRequest)
             qDebug() << "[GET] " <<  request.request().url().toString();
@@ -102,9 +101,9 @@ namespace Network
             QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(progress(qint64,qint64)));
         }
 
-        QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
+//        QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
 
-        timer.start();
+//        timer.start();
         loop.exec();
 
         QByteArray data;
@@ -113,13 +112,12 @@ namespace Network
         {
             data = reply->readAll();
             _error = RequestSender::NoError;
+            qDebug() << "Reply Error:" << reply->error() << reply->errorString() << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         }
         else
-        {
             _error = RequestSender::TimeoutError;
-        }
         if(_error!=NoError)
-            qDebug() << "TimeoutError";
+            qDebug() << "Reply Error:" << reply->error() << reply->errorString() << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
         reply->deleteLater();
 
@@ -132,9 +130,6 @@ namespace Network
 
     QByteArray RequestSender::sendWhileSuccess(Request& request, int maxCount /*= 2*/, bool getRequest /*= true*/)
     {
-//        if (maxCount < 0)
-//            throw QString(__LINE__ + " " __FILE__);
-
         int c = 0;
         QByteArray answer;
 
@@ -147,7 +142,6 @@ namespace Network
                 break;
 
             qDebug() << "Ошибка при отправке запроса. Код ошибки - " << error() << ". Повторная отправка запроса через 2 секунды\n";
-//            QThread::currentThread()->msleep(2000);
             Sleep(2000);
         }
 

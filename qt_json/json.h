@@ -112,11 +112,7 @@ namespace QtJson {
 
     inline QVariantMap to_map(QByteArray array)
     {
-    #ifdef HAVE_QT5
-            return QJsonDocument::fromJson(array).toVariant().toMap();
-    #else
-            return parse(array, "lua").toMap();
-    #endif
+        return parse(array, "lua").toMap();
     }
     inline QVariantMap json_to_map(QByteArray array)
     {

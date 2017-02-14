@@ -29,22 +29,24 @@ public:
 
     QString get_url(QString profile, QString path_to_playback);
     int get_game_info(QString profile, QString path_to_playback);
-    QStringList get_sender_name(bool init=false);
-    QString read_warnings_log(QString str, int offset=0);
+    bool init_player();
+    // искомая строка, отступ от первого слова искомой строки, количество слов в результате
+    QString read_warnings_log(QString str, int offset=0, int count=1);
     QString get_cur_profile_dir();
     QByteArray get_playback_file();
 
     void setAverageAPM(int apm);
+    void setTotalActions(long n);
     int readySend();
     bool timeCompare(QTime t1, QTime t2);
     int timeDifference(QTime t1, QTime t2);
     bool tempRecExist();
     QTime last_playback;
-    QTime last_startgame;
     QTime last_stopgame;
+    QTime last_startgame;
     bool stopgame_valid;
     int average_apm;
-
+    long TotalActions;
     void set_ss_path(const QString &value);
     QString get_steam_id();
     void set_server_addr(QString addr);
@@ -57,6 +59,8 @@ private:
     QStringList errors_list;
     QByteArray _playback;
     QStringList steam_id64;
+    QStringList sender_names;
+    QString sender_steam_id;
     int error_code;
 
 };

@@ -55,8 +55,13 @@ void GameInfo::set_type(int type)
 
 void GameInfo::setAPMR(int apm)
 {
-    apmR = apm;
+    apmRi = apm;
 }
+void GameInfo::setAPMR(double apm)
+{
+    apmRd = apm;
+}
+
 
 void GameInfo::set_winby(QString str)
 {
@@ -118,7 +123,7 @@ QString GameInfo::get_url(QString site_addr)
 
         // записываем реальный apm для игрока который отправляет статистику
         if(_sender_name==_players.at(i).name)
-            site_addr += "apm" +QString::number(i+1)+"r"+"=" + QString::number(apmR) + "&";
+            site_addr += "apm" +QString::number(i+1)+"r"+"=" + QString::number(apmRd) + "&";
     }
 
     // добавим расы игроков
@@ -127,10 +132,6 @@ QString GameInfo::get_url(QString site_addr)
         site_addr += "r" + QString::number(i+1) + "="
                 + QString::number( races.indexOf(_players.at(i).race) + 1) + "&";
     }
-
-    // добавим ключ
-    site_addr += "key=" + QLatin1String(SERVER_KEY) + "&";
-
     // добавим имена победителей
     int win_counter=1;
     for(int i=0; i<_players_count; ++i)
@@ -158,12 +159,16 @@ QString GameInfo::get_url(QString site_addr)
     site_addr += "mod=" + _mod_name + "&";
     // добавим условие победы
     site_addr += "winby=" + _winby + "&";
+    qDebug() << site_addr;
+    // добавим ключ
+    site_addr += "key=" + QLatin1String(SERVER_KEY) + "&";
 
     return site_addr;
 }
 
 void GameInfo::set_map_name(QString str)
 {
+    qDebug() << "Map name:" << str;
     _map_name = str;
 }
 
@@ -179,7 +184,7 @@ void GameInfo::update_player(int id, int state)
 
 void GameInfo::add_player(QString name, QString race, int team_id, int state, int apm)
 {
-    qDebug() << "Adding player:" << name << race;
+    qDebug() << "Adding player:" << name << race << team_id << state;
     TSPlayer p;
     p.name = name;
     p.race = race;

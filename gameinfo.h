@@ -25,6 +25,7 @@ public:
     ~GameInfo();
     void add_player(QString name, QString race, int team_id, int state, int apm=0);
     void set_type(int type);
+    void setAPMR(double apm);
     void setAPMR(int apm);
     void set_winby(QString str);
     QString get_winby();
@@ -53,7 +54,8 @@ private:
     int _teams_number;
     int _players_count;
     int _duration;
-    int apmR;
+    int apmRi;
+    int apmRd;
     QString _winby;
     QString _steam_id;
     QString _sender_name;

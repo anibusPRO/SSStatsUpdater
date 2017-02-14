@@ -110,7 +110,6 @@ long APMMeasure::getAverageAPM() {
 
 long APMMeasure::getTime()
 {
-    qDebug() << "Total Actions:" << getTotalActions();
     return GetTickCount()-absolute_starttick;
 }
 

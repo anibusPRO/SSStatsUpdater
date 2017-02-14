@@ -78,7 +78,7 @@ namespace QtJson {
 
         // Return an empty QVariant if the JSON data is either null or empty
         // Возвращает пустой QVariant если данные JSON нулевые или отсутствуют
-        if (!json.isNull() || !json.isEmpty()) {
+        if (!json.isEmpty()){
             QString data = json;
             // We'll start from index 0
             // начнем с индекса 0
@@ -93,10 +93,9 @@ namespace QtJson {
 
             // Return the parsed value
             return value;
-        } else {
+        } else
             // Return the empty QVariant
             return QVariant();
-        }
     }
 
     QByteArray serialize(const QVariant &data) {
@@ -286,7 +285,7 @@ namespace QtJson {
                 //qDebug() << "parseString";
                 // Parse the key/value pair's name
                 QString name = parseString(json, index, success).toString();
-                //qDebug() << name << success;
+//                qDebug() << name << success;
 
                 if (!success) {
                     return QVariantMap();
@@ -515,14 +514,14 @@ namespace QtJson {
         }
 
         QChar c = json[index];
-        //qDebug() << "char" << c ;
+//        qDebug() << "char" << c ;
         index++;
         if(fileType=="lua")
         switch(c.toLatin1()) {
             case '{': return JsonTokenCurlyOpen;
             case '}': return JsonTokenCurlyClose;
-            case '[': return JsonTokenSquaredOpen;
-            case ']': return JsonTokenSquaredClose;
+//            case '[': return JsonTokenSquaredOpen;
+//            case ']': return JsonTokenSquaredClose;
             case ',': return JsonTokenComma;
             case 'A': case 'B': case 'C': case 'D': case 'E':
             case 'F': case 'G': case 'H': case 'I': case 'J':
@@ -535,11 +534,11 @@ namespace QtJson {
             case 'k': case 'l': case 'm': case 'n': case 'o':
             case 'p': case 'q': case 'r': case 's': case 't':
             case 'u': case 'v': case 'w': case 'x': case 'y':
-            case 'z':
+            case 'z': case '[': case ']': case '-':
             case '"': return JsonTokenString;
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
-            case '-': return JsonTokenNumber;
+            return JsonTokenNumber;
             case '=': return JsonTokenColon;
         }
         else

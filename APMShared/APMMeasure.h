@@ -43,7 +43,7 @@ private:
 
 	static long computeAPM(long actions, DWORD starttick);
 
-	long getTotalActions();
+
 	void setTotalActions(long n);
 public:
 	APMMeasure(APMConfig* n_cfg);
@@ -52,6 +52,7 @@ public:
 	long getAverageAPM();
 	long getCurrentAPM();
     long getTime();
+    long getTotalActions();
     void resetAllAPM();
 	APMLoggableSnapshot getSnapshot();
 };
