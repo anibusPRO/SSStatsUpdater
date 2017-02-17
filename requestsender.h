@@ -37,13 +37,11 @@ namespace Network
     private:
         QByteArray sendRequest(Request& request, bool getRequest = true);
         QByteArray sendWhileSuccess(Request& request, int maxCount = 2, bool getRequest = true);
+        bool waitForConnect(int nTimeOutms, QNetworkAccessManager *manager);
 
-    private:
         qint64 _maxWaitTime;
         RequestError _error;
         QNetworkProxy _proxy;
-    public slots:
-        void progress(qint64 bytesSent, qint64 bytesTotal);
     };
 }
 

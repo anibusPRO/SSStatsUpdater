@@ -20,7 +20,6 @@ StatsCollector::StatsCollector()
     QTextCodec::setCodecForCStrings(QTextCodec::codecForName("utf-8"));
 
     log.installLog();
-//    sender.setMaxWaitTime(10000);
     server_addr = "http://www.dowstats.h1n.ru";
 }
 
@@ -106,7 +105,6 @@ void StatsCollector::start()
 //    QString filename="SSStatsUpdater.dll";
 //    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY) ;
 //    Request request(url + "&name=ssstats.md5&");
-//    RequestSender sender;
 //    QByteArray btar = sender.get(request);
 //    QString md5 = QString::fromUtf8(btar.data());
 //    qDebug() << "stats updater md5 checking...";

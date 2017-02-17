@@ -86,23 +86,8 @@ namespace Network
 
         if (!forGetRequest)
         {
-//            qDebug() << "file size:" << playback.size();
-//            QByteArray param1Name="param1" ,param1Value="value1";
-//            QByteArray paramFileType="replay", paramFileName="temp.rec",
-//                paramContentType="application/octet-stream", paramData=playback;
-
             //задаем разделитель
             QByteArray postData, boundary="1BEF0A57BE110FD467A";
-//            //первый параметр
-//            postData.append("--"+boundary+"\r\n");//разделитель
-//            //имя параметра
-//            postData.append("Content-Disposition: form-data; name=\"");
-//            postData.append(param1Name);
-//            postData.append("\"\r\n\r\n");
-//            //значение параметра
-//            postData.append(param1Value);
-//            postData.append("\r\n");
-
             //параметр 2 - файл
             postData.append("--"+boundary+"\r\n");//разделитель
             //имя параметра
@@ -122,21 +107,16 @@ namespace Network
             //"хвост" запроса
             postData.append("--"+boundary+"--\r\n");
 
-
             r.setHeader(QNetworkRequest::ContentTypeHeader,"multipart/form-data; boundary="+boundary);
             r.setHeader(QNetworkRequest::ContentLengthHeader,QByteArray::number(postData.length()));
-//            qDebug() << "postData size:" << postData.length();
             dataToSend = postData;
-//            qDebug() << "dataToSenda size 1:" << dataToSend.size();
         }
-//        qDebug() << "postData size 2:" << dataToSend.size();
 
         return r;
     }
 
     QByteArray Request::data(bool forGetRequest /*= true*/) const
     {
-//        qDebug() << "forGetRequest" << forGetRequest;
         if(forGetRequest)
         {
             auto b = _params.begin();
@@ -158,11 +138,7 @@ namespace Network
             return byteArrayData;
         }
         else
-        {
-//            qDebug() << "dataToSend" << dataToSend.size();
             return dataToSend;
-        }
-
     }
 
 }

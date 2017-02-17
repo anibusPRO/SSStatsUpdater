@@ -37,7 +37,11 @@ GameInfoReader::GameInfoReader()
                   "Game options is not standart"<<
                   "Sender is not player"<<
                   "Winners count less than game type";
-    stopgame_valid = false;
+    last_playback  = 0;
+    last_startgame = 0;
+    last_stopgame  = 0;
+    playback_error = 0;
+    is_playback = false;
 }
 
 GameInfoReader::~GameInfoReader()
@@ -76,7 +80,7 @@ void GameInfoReader::set_ss_path(const QString &value)
 QString GameInfoReader::get_steam_id()
 {
     if(sender_steam_id.isEmpty())
-        return steam_id64.at(0);
+        return names_steamids.values().first();
     else
         return sender_steam_id;
 }
@@ -90,19 +94,26 @@ void GameInfoReader::set_server_addr(QString addr)
 int GameInfoReader::readySend()
 {
     read_warnings_log("APP -- Game Stop", -1);
-    int diff = timeDifference(last_playback, last_startgame);
 
-    if(diff<=1)
+//    qDebug() << last_playback << last_startgame << last_stopgame << playback_error;
+    if(last_playback>last_stopgame)
+    {
+        is_playback = true;
         return 2;
-    if(!stopgame_valid||timeCompare(last_startgame, last_stopgame))
+    }
+    if(is_playback)
+    {
+        is_playback = false;
+        return 3;
+    }
+    if(last_startgame>last_stopgame)
         return 1;
     return 0;
 }
 
 bool GameInfoReader::tempRecExist()
 {
-    QString time = read_warnings_log("REC -- Error opening file playback:temp.rec for write", -1);
-    return timeCompare(last_startgame, QTime::fromString(time, "hh:mm:ss.z"));
+    return (last_startgame > playback_error);
 }
 
 
@@ -299,7 +310,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
             else
                 return 7;
 
-            if(sender_names.isEmpty())
+            if(names_steamids.isEmpty())
             {
                 qDebug() << "sender name is null";
                 return error_code;
@@ -343,13 +354,14 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                                         ++team_2_p_count;
 
                                 p_name = player.value("PName").toString();
-                                if(sender_names.contains(p_name))
+                                if(names_steamids.keys().contains(p_name))
                                 {
                                     _game_info->set_sender_name(p_name);
 //                                    _game_info->setAPMR(average_apm);
                                     _game_info->setAPMR(AverageAPM);
                                     if(sender_steam_id.isEmpty())
-                                        sender_steam_id = steam_id64.at(sender_names.indexOf(p_name));
+                                        sender_steam_id = names_steamids.value(p_name);
+//                                    steam_id64.at(sender_names.indexOf(p_name));
                                     _game_info->set_steam_id(sender_steam_id);
                                     fnl_state = player.value("PFnlState").toInt();
                                     sender_id = i;
@@ -412,9 +424,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 
             _playback.clear();
 
-            if(!tempRecExist())
-                qDebug() << "REC -- Error opening file playback:temp.rec for write";
-            else
+            if(last_startgame > playback_error)
             {
                 RepReader rep_reader;
                 qDebug() << "playback reading";
@@ -444,6 +454,8 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                 if(rep_reader.playerIsObserver(_game_info->get_sender_name()))
                     return 23;
             }
+            else
+                qDebug() << "REC -- Error opening file playback:temp.rec for write";
         }
         else
             return 4;
@@ -470,12 +482,12 @@ bool GameInfoReader::init_player()
         QSettings settings_second("HKEY_CURRENT_USER\\Software\\Valve\\Steam", QSettings::NativeFormat);
         steam_path = settings_second.value("SteamPath").toString();
     }
-
+    QString reg_url = server_addr+"/regplayer.php?&key="+QLatin1String(SERVER_KEY)+"&";
+    int i=0;
     if(userdata_dir.cd(steam_path + "/userdata"))
     {
         if(userdata_dir.entryInfoList().size()>2)
         {
-            qDebug() << userdata_dir.path();
             foreach (QString name, userdata_dir.entryList())
             {
                 if(name!="."&&name!="..")
@@ -483,16 +495,11 @@ bool GameInfoReader::init_player()
                     userdata_dir.cd(name);
                     if(userdata_dir.entryList().contains("9450"))
                     {
-                        account_id32_str = name;
-                        account_id32 = account_id32_str.toInt();
-                        quint64 account_id64 = 76561197960265728 + account_id32;
-                        QString account_id64_str = QString::number(account_id64);
+                        QString account_id64_str = QString::number(76561197960265728 + name.toInt());
                         QString url = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+account_id64_str+"&format=json";
                         Request request(url);
                         QByteArray steam_response = sender.getWhileSuccess(request);
-//                        qDebug() << QString::fromUtf8(steam_response.data());
                         QVariantMap player_info = QtJson::json_to_map(steam_response);
-//                        qDebug() << player_info;
                         if(player_info.contains("response"))
                         {
                             QVariantMap response = player_info.value("response").toMap();
@@ -503,15 +510,12 @@ bool GameInfoReader::init_player()
                                     if(players.at(0).toMap().contains("personaname"))
                                     {
                                         player_name = players.at(0).toMap().value("personaname").toString();
-                                        steam_id64 << account_id64_str;
-                                        sender_names << player_name;
-                                        qDebug() << "Steam ID associated with Soulstorm:" << account_id64 << player_name;
+                                        names_steamids.insert(player_name, account_id64_str);
+                                        qDebug() << "Steam ID associated with Soulstorm:" << account_id64_str << player_name;
                                         QString hex_name(player_name.toUtf8().toHex());
-                                        Request request_to_server(server_addr+"/regplayer.php?name="+hex_name+"&sid="+account_id64_str+"&key="+QLatin1String(SERVER_KEY));
-                                        QByteArray response_fromstat = sender.getWhileSuccess(request_to_server);
-                                        qDebug() << "registration in dowstats: " << QString::fromUtf8(response_fromstat.data());
-                                        if(response_fromstat.isNull())
-                                            qDebug() << "Server returned empty data";
+                                        QString num = QString::number(i);
+                                        reg_url += "name"+num+"="+hex_name+"&sid"+num+"="+account_id64_str+"&";
+                                        ++i;
                                     }
                                     else
                                         error_code = 15;
@@ -534,11 +538,17 @@ bool GameInfoReader::init_player()
     else
         error_code = 9;
 
-    if(steam_id64.isEmpty()||error_code!=0)
+    if(names_steamids.isEmpty()||error_code!=0)
     {
         qDebug() << errors_list.at(error_code);
         return false;
     }
+    qDebug() << reg_url;
+    Request request_to_server(reg_url);
+    QByteArray response_fromstat = sender.getWhileSuccess(request_to_server);
+    qDebug() << "registration in dowstats: " << QString::fromUtf8(response_fromstat.data());
+    if(response_fromstat.isNull())
+        qDebug() << "Server returned empty data";
     return true;
 }
 
@@ -555,21 +565,20 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
 
     QTextStream textStream(&file);
 
-    QString str_stop = "Game Stop";
-    QString str_start = "Game Start";
-    QString str_playback = "Game Playback";
+    QStringList game_flags;
+    game_flags << "APP -- Game Stop"
+               << "APP -- Game Start"
+               << "APP -- Game Playback"
+               << "REC -- Error opening file playback:temp.rec for write";
+
+
     bool fstate = false;
-    int state_offset = -3;
     QStringList fileLines = textStream.readAll().split("\n");
-    int counter, end;
-
-    end = 0;
-    counter = fileLines.size()-1;
-
-    while (counter!=end)
+    int counter = fileLines.size();
+    while (counter!=0)
     {
         // читаем следующую строку из файла
-        QString line = fileLines.at(counter);
+        QString line = fileLines.at(counter-1);
         // если текущаю строка содержит переданную в параметрах строку
         if(line.contains(str/*, Qt::CaseInsensitive*/))
         {
@@ -603,38 +612,21 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
                 out = out.left(out.size()-1);
 
         }
-        if(!fstate&&(line.contains(str_stop/* , Qt::CaseInsensitive*/)||
-           line.contains(str_start/*, Qt::CaseInsensitive*/)||
-           line.contains(str_playback/*, Qt::CaseInsensitive*/)))
+        line = line.remove("\n");
+        line = line.remove("\r");
+        if(!fstate&&game_flags.contains(line.mid(14, line.size()-3)))
         {
-            line = line.remove(',');
-            line = line.remove("\n");
-            line = line.remove("\r");
-
-            QStringList list = line.split(" ");
-            list.removeAll("");
-
-            if(list.contains("Game"/*, Qt::CaseInsensitive*/))
+            if(line.contains(game_flags.at(0)))
             {
-                int index = list.indexOf("Game"/*, Qt::CaseInsensitive*/);
-
-                if(index!=-1)
-                {
-                    if(list.at(4).contains("Stop"/*, Qt::CaseInsensitive*/))
-                    {
-                        last_stopgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
-                        stopgame_valid = true;
-                        fstate = true;
-                    }
-                    if(list.at(4).contains("Start"/*, Qt::CaseInsensitive*/))
-                        last_startgame = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
-
-                    if(list.at(4).contains("Playback"/*, Qt::CaseInsensitive*/))
-                        last_playback = QTime::fromString(list[index+state_offset], "hh:mm:ss.z");
-                }
-                else
-                    qDebug() << "out of range" << "Game" << counter;
+                last_stopgame = counter;
+                fstate = true;
             }
+            if(line.contains(game_flags.at(1)))
+                last_startgame = counter;
+            if(line.contains(game_flags.at(2)))
+                last_playback = counter;
+            if(line.contains(game_flags.at(3)))
+                playback_error = counter;
         }
 
         // если искомое слово найдено, то можно завершать цикл

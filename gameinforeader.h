@@ -41,9 +41,11 @@ public:
     bool timeCompare(QTime t1, QTime t2);
     int timeDifference(QTime t1, QTime t2);
     bool tempRecExist();
-    QTime last_playback;
-    QTime last_stopgame;
-    QTime last_startgame;
+    int last_playback;
+    int last_startgame;
+    int last_stopgame;
+    int playback_error;
+    bool is_playback;
     bool stopgame_valid;
     int average_apm;
     long TotalActions;
@@ -58,8 +60,9 @@ private:
     QString ss_path;
     QStringList errors_list;
     QByteArray _playback;
-    QStringList steam_id64;
-    QStringList sender_names;
+    QMap<QString, QString> names_steamids;
+//    QStringList steam_id64;
+//    QStringList sender_names;
     QString sender_steam_id;
     int error_code;
 

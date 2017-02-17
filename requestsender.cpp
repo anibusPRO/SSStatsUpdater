@@ -4,7 +4,7 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QDebug>
-#include <QThread>
+
 #include <QDateTime>
 #include "requestsender.h"
 #include <windows.h>
@@ -70,40 +70,28 @@ namespace Network
 
         QEventLoop loop;
         QSharedPointer<QNetworkAccessManager> manager(new QNetworkAccessManager);
-        manager->setProxy(_proxy);
+
         QNetworkRequest req;
 
         if(getRequest)
             req = request.request();
         else
             req = request.request(getRequest);
-//        qDebug() << "prepare to send complite";
-//        qDebug() << "send replay:" << getRequest;
+        req.setRawHeader("User-Agent", "SSStats");
         QNetworkReply* reply = getRequest ? manager->get(req) :
                                             manager->post(req, request.data(getRequest));
         reply->ignoreSslErrors();
-#if defined(NETWORK_SHOW_SEND_REQUESTS)
-        if (getRequest)
-            qDebug() << "[GET] " <<  request.request().url().toString();
-        else
-            qDebug() << "[POST]" << request.request(false).url().toString() << request.data();
-#endif
-
-//        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-//        QObject::connect(&timer, &QTimer::timeout, reply, &QNetworkReply::abort);
 
         QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+
         if (getRequest)
             QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), &timer, SLOT(start()));
         else
-        {
             QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), &timer, SLOT(start()));
-            QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(progress(qint64,qint64)));
-        }
 
-//        QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
+        QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
 
-//        timer.start();
+        timer.start();
         loop.exec();
 
         QByteArray data;
@@ -112,18 +100,17 @@ namespace Network
         {
             data = reply->readAll();
             _error = RequestSender::NoError;
-            qDebug() << "Reply Error:" << reply->error() << reply->errorString() << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         }
         else
             _error = RequestSender::TimeoutError;
         if(_error!=NoError)
-            qDebug() << "Reply Error:" << reply->error() << reply->errorString() << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            qDebug() << "Reply Error:"
+                     << reply->error() << "\n"
+                     << reply->errorString() << "\n"
+                     << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                     << reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();;
 
         reply->deleteLater();
-
-#if defined(NETWORK_SHOW_SEND_REQUESTS)
-        qDebug() << "[ANSWER]" << data;
-#endif
 
         return data;
     }
@@ -148,9 +135,46 @@ namespace Network
         return answer;
     }
 
-    void RequestSender::progress(qint64 bytesSent, qint64 bytesTotal)
+    bool RequestSender::waitForConnect(int nTimeOutms, QNetworkAccessManager *manager)
     {
-        qDebug() << "uploading progress:" << (double)bytesSent*100/(double)bytesTotal <<"%";
-    }
+//        QTimer *timer = NULL;
+//        QEventLoop eventLoop;
+//        bool bReadTimeOut = false;
 
+//        m_bReadTimeOut = false;
+
+//        if (nTimeOutms > 0)
+//        {
+//            timer = new QTimer(this);
+
+//            connect(timer, SIGNAL(timeout()), this, SLOT(slotWaitTimeout()));
+//            timer->setSingleShot(true);
+//            timer->start(nTimeOutms);
+
+//            connect(this, SIGNAL(signalReadTimeout()), &eventLoop, SLOT(quit()));
+//        }
+
+//        // Wait on QNetworkManager reply here
+//        connect(manager, SIGNAL(finished(QNetworkReply *)), &eventLoop, SLOT(quit()));
+
+//        if (m_pReply != NULL)
+//        {
+//            // Preferrably we wait for the first reply which comes faster than the finished signal
+//            connect(m_pReply, SIGNAL(readyRead()), &eventLoop, SLOT(quit()));
+//        }
+//        eventLoop.exec();
+
+//        if (timer != NULL)
+//        {
+//            timer->stop();
+//            delete timer;
+//            timer = NULL;
+//        }
+
+//        bReadTimeOut = m_bReadTimeOut;
+//        m_bReadTimeOut = false;
+
+//        return !bReadTimeOut;
+    }
 }
+
