@@ -87,9 +87,9 @@ void StatsCollector::start()
     QSettings settings("stats.ini", QSettings::IniFormat);
 
     // получаем из файла конфигураций данные о размере буфера
-    bool onlyinit = settings.value("settings/onlyinit", false).toBool();
+//    bool onlyinit = settings.value("settings/onlyinit", false).toBool();
     bool enablestats = settings.value("settings/enablestats", true).toBool();
-    bool apmmeter = settings.value("settings/apmmeter", true).toBool();
+//    bool apmmeter = settings.value("settings/apmmeter", true).toBool();
     version = settings.value("info/version", "0.0.0").toString();
     server_addr = settings.value("settings/serveraddr", "http://www.tpmodstat.16mb.com").toString();
     reader.set_server_addr(server_addr);
@@ -136,11 +136,11 @@ void StatsCollector::start()
         return;
     }
     qDebug() << "Player successfully initialized";
-    if(onlyinit)
-    {
-        qDebug() << "onlyinit";
-        return;
-    }
+//    if(onlyinit)
+//    {
+//        qDebug() << "onlyinit";
+//        return;
+//    }
 
     QString ss_path =  get_soulstorm_installlocation();
     reader.set_ss_path(ss_path);
@@ -217,7 +217,7 @@ void StatsCollector::start()
                         emit start_meter();
 
                     // ждем пока игра не закончится
-                    while(reader.readySend()==1)
+                    while(reader.readySend()!=0)
                         Sleep(5000);
                     break;
                 // игра - просмотр реплея
@@ -230,18 +230,21 @@ void StatsCollector::start()
             }
             old_time = last_time;
         }
-        cur_profile = reader.get_cur_profile_dir();
-        if((!cur_profile.isNull())&&path_to_profile != cur_profile)
+        else
         {
-            path_to_profile = cur_profile;
-            TSinfo.setFile(path_to_profile + "/testStats.lua");
-            old_time = TSinfo.lastModified();
-            qDebug() << "path_to_profile:" << path_to_profile;
+            cur_profile = reader.get_cur_profile_dir();
+            if((!cur_profile.isNull())&&path_to_profile != cur_profile)
+            {
+                path_to_profile = cur_profile;
+                TSinfo.setFile(path_to_profile + "/testStats.lua");
+                old_time = TSinfo.lastModified();
+                qDebug() << "path_to_profile:" << path_to_profile;
+            }
+            // отправим лог файлы
+            send_logfile();
+            Sleep(10000);
+            ++n;
         }
-        // отправим лог файлы
-        send_logfile();
-        Sleep(10000);
-        ++n;
     }
     if(thread->isRunning())
     {
@@ -287,7 +290,7 @@ bool StatsCollector::send_stats(QString path_to_profile, QString path_to_playbac
         Request request(url);
         if(request.setFile(reader.get_playback_file(),
                         "replay",
-                        "temp.rec",
+                        reader.get_playback_name(),
                         "application/octet-stream"))
             qDebug() << "Отправка статистики с реплеем. Ответ от сервера:\n" << QString::fromUtf8(sender.postWhileSuccess(request).data());
         else

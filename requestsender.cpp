@@ -73,13 +73,12 @@ namespace Network
 
         QNetworkRequest req;
 
-        if(getRequest)
-            req = request.request();
-        else
-            req = request.request(getRequest);
+        req = request.request(getRequest);
         req.setRawHeader("User-Agent", "SSStats");
-        QNetworkReply* reply = getRequest ? manager->get(req) :
-                                            manager->post(req, request.data(getRequest));
+        QNetworkReply* reply = getRequest ?
+                        manager->get(req) :
+                        manager->post(req, request.data(getRequest));
+
         reply->ignoreSslErrors();
 
         QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
@@ -95,17 +94,24 @@ namespace Network
         loop.exec();
 
         QByteArray data;
-
-        if (reply->isFinished() && reply->error() == QNetworkReply::NoError)
+        int network_error;
+        if (reply->isFinished())
         {
-            data = reply->readAll();
-            _error = RequestSender::NoError;
+            network_error = reply->error();
+            if(network_error==QNetworkReply::NoError)
+            {
+                data = reply->readAll();
+                _error = RequestSender::NoError;
+            }
+            else
+                _error = RequestSender::NetworkError;
         }
         else
             _error = RequestSender::TimeoutError;
+
         if(_error!=NoError)
             qDebug() << "Reply Error:"
-                     << reply->error() << "\n"
+                     << network_error << _error << "\n"
                      << reply->errorString() << "\n"
                      << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
                      << reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();;
@@ -133,48 +139,6 @@ namespace Network
         }
 
         return answer;
-    }
-
-    bool RequestSender::waitForConnect(int nTimeOutms, QNetworkAccessManager *manager)
-    {
-//        QTimer *timer = NULL;
-//        QEventLoop eventLoop;
-//        bool bReadTimeOut = false;
-
-//        m_bReadTimeOut = false;
-
-//        if (nTimeOutms > 0)
-//        {
-//            timer = new QTimer(this);
-
-//            connect(timer, SIGNAL(timeout()), this, SLOT(slotWaitTimeout()));
-//            timer->setSingleShot(true);
-//            timer->start(nTimeOutms);
-
-//            connect(this, SIGNAL(signalReadTimeout()), &eventLoop, SLOT(quit()));
-//        }
-
-//        // Wait on QNetworkManager reply here
-//        connect(manager, SIGNAL(finished(QNetworkReply *)), &eventLoop, SLOT(quit()));
-
-//        if (m_pReply != NULL)
-//        {
-//            // Preferrably we wait for the first reply which comes faster than the finished signal
-//            connect(m_pReply, SIGNAL(readyRead()), &eventLoop, SLOT(quit()));
-//        }
-//        eventLoop.exec();
-
-//        if (timer != NULL)
-//        {
-//            timer->stop();
-//            delete timer;
-//            timer = NULL;
-//        }
-
-//        bReadTimeOut = m_bReadTimeOut;
-//        m_bReadTimeOut = false;
-
-//        return !bReadTimeOut;
     }
 }
 

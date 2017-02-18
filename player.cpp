@@ -80,6 +80,42 @@ QString Player::getShortRaceName() const
     }
 }
 
+QString Player::getVeryShortRaceName() const
+{
+    switch (getResolvedRace()) {
+    case 1:
+        return QString("M");
+        break;
+    case 2:
+        return QString("O");
+        break;
+    case 3:
+        return QString("E");
+        break;
+    case 4:
+        return QString("C");
+        break;
+    case 5:
+        return QString("D");
+        break;
+    case 6:
+        return QString("N");
+        break;
+    case 7:
+        return QString("S");
+        break;
+    case 8:
+        return QString("T");
+        break;
+    case 9:
+        return QString("I");
+        break;
+    default:
+        return QString("B");
+        break;
+    }
+}
+
 int Player::getResolvedType() const
 {
     if (Name.isNull() || Race.isNull())

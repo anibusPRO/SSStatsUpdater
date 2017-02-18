@@ -3,7 +3,6 @@
 //#define NETWORK_SHOW_SEND_REQUESTS
 
 #include <QNetworkProxy>
-
 #include "request.h"
 
 namespace Network
@@ -16,7 +15,8 @@ namespace Network
         enum RequestError
         {
             NoError,
-            TimeoutError
+            TimeoutError,
+            NetworkError
         };
 
         RequestSender(qint64 maxWaitTime = 35000);
@@ -37,7 +37,6 @@ namespace Network
     private:
         QByteArray sendRequest(Request& request, bool getRequest = true);
         QByteArray sendWhileSuccess(Request& request, int maxCount = 2, bool getRequest = true);
-        bool waitForConnect(int nTimeOutms, QNetworkAccessManager *manager);
 
         qint64 _maxWaitTime;
         RequestError _error;

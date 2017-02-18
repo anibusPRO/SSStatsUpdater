@@ -53,6 +53,7 @@ public:
     QString getResolvedTypeStr() const;
     int getResolvedRace() const;
     QString getShortRaceName() const;
+    QString getVeryShortRaceName() const;
     bool isEmpty() const;
     bool isSpectator() const;
 };

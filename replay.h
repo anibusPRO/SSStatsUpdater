@@ -102,7 +102,7 @@ public:
     int getVersion() const;
     void setVersion(int value);
 
-    QString getShortMapName() const;
+    QString getShortMapName();
     QString getMap() const;
     void setMap(const QString &value);
 

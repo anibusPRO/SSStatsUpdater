@@ -3,6 +3,7 @@
 #include <QDebug>
 #include "repreader.h"
 #include <QFile>
+#include <QStringList>
 
 RepReader::RepReader()
 {
@@ -310,149 +311,68 @@ QByteArray RepReader::add_zeros(QString str)
 
 QString RepReader::RenameReplay()
 {
-
-
     QString ingame_rep_name="";
-
-    if(replay->PlayerCount==2)
+    QStringList clan_tags;
+    int p_count = replay->PlayerCount;
+    clan_tags <<"Cg|"<<"AZ|"<<"sF|"<<"HG|"<<"RuW|"<<"SWS}{"<<"Sugar_"<<"[TOXiC]"<<"{KILLA}"<<"[SWS]";
+    if(p_count==2)
     {
-        for(int i=0; i<replay->PlayerCount; ++i)
+        for(int i=0; i<p_count; ++i)
         {
-            if(replay->Players.at(i)->Name.contains("Cg|")||replay->Players.at(i)->Name.contains("AZ|")
-                    ||replay->Players.at(i)->Name.contains("sF|")||replay->Players.at(i)->Name.contains("HG|"))
-                replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0, 3);
-
-            //                qDebug() <<"Cg|"<<"AZ|"<<"sF|"<<"HG|";
-            if(replay->Players.at(i)->Name.contains("RuW|"))
-                replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0, 4);
-            if(replay->Players.at(i)->Name.contains("SWS}{")||replay->Players.at(i)->Name.contains("AZ | "))
-                replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0, 5);
-            if(replay->Players.at(i)->Name.contains("Sugar_"))
-                replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0, 6);
-            if(replay->Players.at(i)->Name.contains("[TOXiC]")||replay->Players.at(i)->Name.contains("{KILLA}"))
-                replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0, 7);
+            foreach (QString tag, clan_tags) {
+                if(replay->Players.at(i)->Name.contains(tag))
+                    replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0,tag.size());
+            }
         }
-
-        ingame_rep_name += replay->Players.at(0)->Name.left(7);
-        ingame_rep_name += "V"+replay->Players.at(1)->Name.left(7) + "|";
-        ingame_rep_name += replay->Players.at(0)->getShortRaceName();
-        ingame_rep_name += "/"+replay->Players.at(1)->getShortRaceName() + "|";
-        ingame_rep_name += replay->getShortMapName();
-
-        // найдем строку за которой следует имя реплейя в файле
-        BinReader->device()->seek(replay->BeginNAME);
-
-        // получим длину названия реплея в игре
-        int rep_name_length = BinReader->ReadInt32();
-
-        // обновим размеры блоков данных в файле
-        // посчитаем разницу между старым и новым называнием
-        int bytesLengthDifference = (ingame_rep_name.size() - rep_name_length)*2;
-
-        this->BinReader->device()->seek(replay->BeginFOLDINFO);
-        this->BinReader->WriteInt32(replay->LengthFOLDINFO+bytesLengthDifference);
-
-        this->BinReader->device()->seek(replay->BeginDATABASE);
-        this->BinReader->WriteInt32(replay->LengthDATABASE+bytesLengthDifference);
-
-
-        this->BinReader->device()->seek(replay->BeginNAME+4+rep_name_length*2);
-        QByteArray temp_buffer;
-        temp_buffer = this->BinReader->device()->readAll();
-
-        this->BinReader->device()->seek(replay->BeginNAME);
-
-        QByteArray tr = add_zeros(ingame_rep_name);
-        BinReader->device()->write(tr);
-        BinReader->device()->write(temp_buffer);
+        ingame_rep_name += replay->Players.at(0)->getVeryShortRaceName();
+        ingame_rep_name += "v"+replay->Players.at(1)->getVeryShortRaceName() + "|";
+        ingame_rep_name += replay->getShortMapName() + "|";
+        ingame_rep_name += replay->Players.at(0)->Name.left(8);
+        ingame_rep_name += "V"+replay->Players.at(1)->Name.left(8);
     }
     else
     {
-        for(int i=0; i<replay->PlayerCount-1; ++i)
-        {
-            ingame_rep_name += replay->Players.at(i)->getShortRaceName() + "-";
-        }
-        ingame_rep_name += replay->Players.at(replay->PlayerCount-1)->getShortRaceName();
-        if(replay->PlayerCount<8)
-            ingame_rep_name += replay->getShortMapName();
-
-        // найдем строку за которой следует имя реплейя в файле
-        BinReader->device()->seek(replay->BeginNAME);
-
-        // получим длину названия реплея в игре
-        int rep_name_length = BinReader->ReadInt32();
-
-        // обновим размеры блоков данных в файле
-        // посчитаем разницу между старым и новым называнием
-        int bytesLengthDifference = (ingame_rep_name.size() - rep_name_length)*2;
-
-        this->BinReader->device()->seek(replay->BeginFOLDINFO);
-        this->BinReader->WriteInt32(replay->LengthFOLDINFO+bytesLengthDifference);
-
-        this->BinReader->device()->seek(replay->BeginDATABASE);
-        this->BinReader->WriteInt32(replay->LengthDATABASE+bytesLengthDifference);
-
-
-        this->BinReader->device()->seek(replay->BeginNAME+4+rep_name_length*2);
-        QByteArray temp_buffer;
-        temp_buffer = this->BinReader->device()->readAll();
-
-        this->BinReader->device()->seek(replay->BeginNAME);
-
-        QByteArray tr = add_zeros(ingame_rep_name);
-        BinReader->device()->write(tr);
-        BinReader->device()->write(temp_buffer);
+        for(int i=0; i<p_count; ++i)
+            ingame_rep_name += replay->Players.at(i)->getVeryShortRaceName() + "/";
+        ingame_rep_name += replay->getShortMapName();
     }
 
-//    //    QString rep_filename="";
-//    QString ingame_rep_name="";
+    // найдем строку за которой следует имя реплейя в файле
+    BinReader->device()->seek(replay->BeginNAME);
 
-//    if(this->replay->PlayerCount==2)
-//    {
-//        ingame_rep_name += this->replay->Players.at(0)->Name.left(7);
-//        ingame_rep_name += "V"+this->replay->Players.at(1)->Name.left(7) + "|";
-//        ingame_rep_name += this->replay->Players.at(0)->getShortRaceName();
-//        ingame_rep_name += "/"+this->replay->Players.at(1)->getShortRaceName() + "|";
-//        ingame_rep_name += this->replay->getShortMapName();
-////        qDebug() << ingame_rep_name;
-//        // найдем строку за которой следует имя реплейя в файле
-//        BinReader->device()->seek(this->replay->BeginNAME);
+    // получим длину названия реплея в игре
+    int rep_name_length = BinReader->ReadInt32();
 
-//        // получим длину названия реплея в игре
-//        int rep_name_length = BinReader->ReadInt32();
+    // обновим размеры блоков данных в файле
+    // посчитаем разницу между старым и новым называнием
+    int bytesLengthDifference = (ingame_rep_name.size() - rep_name_length)*2;
 
-//        // обновим размеры блоков данных в файле
-//        // посчитаем разницу между старым и новым называнием
-//        int bytesLengthDifference = abs(rep_name_length - ingame_rep_name.size())*2;
+    this->BinReader->device()->seek(replay->BeginFOLDINFO);
+    this->BinReader->WriteInt32(replay->LengthFOLDINFO+bytesLengthDifference);
 
-//        this->BinReader->device()->seek(this->replay->BeginFOLDINFO);
-//        this->BinReader->WriteInt32(this->replay->LengthFOLDINFO+bytesLengthDifference);
+    this->BinReader->device()->seek(replay->BeginDATABASE);
+    this->BinReader->WriteInt32(replay->LengthDATABASE+bytesLengthDifference);
 
-//        this->BinReader->device()->seek(this->replay->BeginDATABASE);
-//        this->BinReader->WriteInt32(this->replay->LengthDATABASE+bytesLengthDifference);
+    this->BinReader->device()->seek(replay->BeginNAME+4+rep_name_length*2);
+    QByteArray temp_buffer;
+    temp_buffer = this->BinReader->device()->readAll();
 
+    this->BinReader->device()->seek(replay->BeginNAME);
 
-//        this->BinReader->device()->seek(this->replay->BeginNAME+4+rep_name_length*2);
-//        QByteArray temp_buffer;
-//        temp_buffer = this->BinReader->device()->readAll();
+    QByteArray tr = add_zeros(ingame_rep_name);
+    BinReader->device()->write(tr);
+    BinReader->device()->write(temp_buffer);
 
-//        this->BinReader->device()->seek(this->replay->BeginNAME);
+    QString rep_filename="",races="",players="";
 
-//        QByteArray tr = add_zeros(ingame_rep_name);
-//        BinReader->device()->write(tr);
-//        BinReader->device()->write(temp_buffer);
-//    }
-        // получим данные о текущей дате
-    //    QString date = QDateTime::currentDateTime().toString(".yyyy-MM-dd.hh-mm-ss'.png'");
+    for(int i=0; i<p_count; ++i)
+    {
+        races += replay->Players.at(i)->getVeryShortRaceName();
+        players += "#"+replay->Players.at(i)->Name;
+    }
+    rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName()+players;
 
-    //    rep_filename += QString::number(this->replay->PlayerCount) + "P";
-    //    for(int i=0; i<this->replay->PlayerCount; ++i)
-    //        rep_filename += "_"+this->replay->Players.at(i)->Name;
-    //    for(int i=0; i<this->replay->PlayerCount; ++i)
-    //        rep_filename += "_"+this->replay->Players.at(i)->getShortRaceName();
-    //    rep_filename += "_"+this->replay->getShortMapName();
-
-        return /*rep_filename*/QString();
+    return rep_filename;
 }
 
 QString RepReader::RenameReplay(Replay *rep)

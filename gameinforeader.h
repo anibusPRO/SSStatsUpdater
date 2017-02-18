@@ -34,13 +34,10 @@ public:
     QString read_warnings_log(QString str, int offset=0, int count=1);
     QString get_cur_profile_dir();
     QByteArray get_playback_file();
-
+    QString get_playback_name();
     void setAverageAPM(int apm);
     void setTotalActions(long n);
     int readySend();
-    bool timeCompare(QTime t1, QTime t2);
-    int timeDifference(QTime t1, QTime t2);
-    bool tempRecExist();
     int last_playback;
     int last_startgame;
     int last_stopgame;
@@ -60,9 +57,8 @@ private:
     QString ss_path;
     QStringList errors_list;
     QByteArray _playback;
+    QString playback_name;
     QMap<QString, QString> names_steamids;
-//    QStringList steam_id64;
-//    QStringList sender_names;
     QString sender_steam_id;
     int error_code;
 

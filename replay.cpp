@@ -194,12 +194,12 @@ QString Replay::getMap() const
     return Map;
 }
 
-QString Replay::getShortMapName() const
+QString Replay::getShortMapName()
 {
     QString name="";
-    QStringList lst = Map.split('_');
-    for(int i=1; i<lst.size();++i)
-        name += lst.at(i).left(1).toUpper();
+    QStringList lst = Map.right(Map.size()-2).split('_');
+    foreach (QString word, lst)
+        name += word.left(1).toUpper();
     return name;
 }
 
