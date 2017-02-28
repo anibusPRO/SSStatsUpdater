@@ -27,40 +27,37 @@ public:
     GameInfoReader();
     ~GameInfoReader();
 
-    QString get_url(QString profile, QString path_to_playback);
-    int get_game_info(QString profile, QString path_to_playback);
-    bool init_player();
-    // искомая строка, отступ от первого слова искомой строки, количество слов в результате
+    QString get_game_info(QString profile);
     QString read_warnings_log(QString str, int offset=0, int count=1);
     QString get_cur_profile_dir();
-    QByteArray get_playback_file();
+    QString get_steam_id();
     QString get_playback_name();
-    void setAverageAPM(int apm);
+    QByteArray get_playback_file();
     void setTotalActions(long n);
+    void set_ss_path(const QString &value);
+    void set_accounts(QMap<QString, QString> map);
     int readySend();
+
+private:
+    int search_info(QString profile);
+    GameInfo *_game_info;
+    QString sender_steam_id;
+    QString cur_profile_name;
+    QString ss_path;
+    QString playback_name;
+    QStringList errors_list;
+    QByteArray _playback;
+    QMap<QString, QString> accounts;
+
+    bool is_playback;
+    bool stopgame_valid;
     int last_playback;
     int last_startgame;
     int last_stopgame;
     int playback_error;
-    bool is_playback;
-    bool stopgame_valid;
     int average_apm;
-    long TotalActions;
-    void set_ss_path(const QString &value);
-    QString get_steam_id();
-    void set_server_addr(QString addr);
-
-private:
-    QString server_addr;
-    GameInfo *_game_info;
-    QString cur_profile_name;
-    QString ss_path;
-    QStringList errors_list;
-    QByteArray _playback;
-    QString playback_name;
-    QMap<QString, QString> names_steamids;
-    QString sender_steam_id;
     int error_code;
+    long TotalActions;
 
 };
 

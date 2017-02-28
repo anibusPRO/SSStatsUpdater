@@ -16,12 +16,12 @@ static QFile* logFile;
 // Вывод логов в файл
 void customMessageHandler(QtMsgType type, const char* msg);
 
-logger::logger()
+Logger::Logger()
 {
 
 }
 
-logger::~logger()
+Logger::~Logger()
 {
 
 }
@@ -36,7 +36,7 @@ void customMessageHandler(QtMsgType type, const char* msg)
     }
 }
 
-void logger::installLog()
+void Logger::installLog()
 {
     logFile = new QFile("stats.log");
     if(logFile->open(QIODevice::WriteOnly | QIODevice::Unbuffered))
@@ -65,7 +65,7 @@ void logger::installLog()
     qDebug("Success opening log file");
 }
 
-void logger::finishLog()
+void Logger::finishLog()
 {
     qDebug("Success closing log file");
 
@@ -77,7 +77,7 @@ void logger::finishLog()
     qInstallMsgHandler(0);
 }
 
-QString logger::getOSInfo()
+QString Logger::getOSInfo()
 {
     QString infoStr("Current Operating System: %1");
     #ifdef Q_OS_WIN

@@ -10,13 +10,11 @@
 #include "apmmeter.h"
 #include <QCoreApplication>
 
-using namespace Network;
-
 class StatsCollector : public QObject
 {
     Q_OBJECT
 public:
-    StatsCollector();
+    StatsCollector(QObject* pobj=0);
     ~StatsCollector();
     void start();
 
@@ -27,25 +25,33 @@ public:
     bool stop=false;
 
 private:
-    QCoreApplication *app;
-    APMMeter *apm_meter;
-    // получает путь до игры из реестра windows
     QString get_soulstorm_installlocation();
-    // отправляет статистику взятую из файлв testStats.lua в папке path_to_profile
-    bool send_stats(QString path_to_profile, QString path_to_playback);
-    bool send_logfile();
-    int updateUpdater();
     QString calcMD5(QString fileName);
     QString calcMD5(QByteArray data);
-//    GameInfo *info;
-    GameInfoReader reader;
-    logger log;
-    RequestSender sender;
-    // для хранения адреса сервера
+    bool init_player();
+    bool send_stats(QString path_to_profile);
+    bool send_logfile();
+    int updateUpdater();
+    QMap<QString, QString> accounts;
     QString server_addr;
     QString version;
+    QCoreApplication *app;
+    RequestSender* sender;
+    GameInfoReader* reader;
+    APMMeter *apm_meter;
+    Logger log;
+
 signals:
     void start_meter();
+    void sendfile(QString url,
+                  QString name,
+                  QString content,
+                  QByteArray data);
+    void get(QString url);
+
+private slots:
+//    void slotError ( );
+    void slotDone (const QUrl&url, const QByteArray&btr);
 };
 
 #endif // STATSCOLLECTOR_H

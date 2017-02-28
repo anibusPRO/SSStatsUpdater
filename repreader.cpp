@@ -372,6 +372,8 @@ QString RepReader::RenameReplay()
     }
     rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName()+players;
 
+    rep_filename.replace(QRegExp("[^\\w\#\.]"),"");
+
     return rep_filename;
 }
 
@@ -474,6 +476,11 @@ bool RepReader::isStandart(int game_type)
         return false;
     }
     return true;
+}
+
+QString RepReader::getMapLocale()
+{
+    return replay->MapLocale;
 }
 
 int RepReader::FindString(QString str, int max_offset)

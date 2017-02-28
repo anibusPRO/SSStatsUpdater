@@ -17,11 +17,11 @@
 #include <QFile>
 #include <QTextStream>
 
-class logger
+class Logger
 {
 public:
-    logger();
-    ~logger();
+    Logger();
+    ~Logger();
 
     //#define __DATE__
     //#define __TIME__

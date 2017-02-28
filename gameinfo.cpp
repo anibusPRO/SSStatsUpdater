@@ -7,42 +7,29 @@ GameInfo::GameInfo(int players_count)
 {
     _players.reserve(players_count);
 
-    races.push_back("space_marine_race");
-    races.push_back("chaos_marine_race");
-    races.push_back("ork_race"         );
-    races.push_back("eldar_race"       );
-    races.push_back("guard_race"       );
-    races.push_back("necron_race"      );
-    races.push_back("tau_race"         );
-    races.push_back("sisters_race"     );
-    races.push_back("dark_eldar_race"  );
+    races << "space_marine_race"
+        <<"chaos_marine_race"
+        <<"ork_race"
+        <<"eldar_race"
+        <<"guard_race"
+        <<"necron_race"
+        <<"tau_race"
+        <<"sisters_race"
+        <<"dark_eldar_race";
 
     _players_count = players_count;
     _map_name = "";
     _type = 0;
     _winby = "";
-    _teams_number = 0;
     _duration = 0;
     _sender_name = "";
     _steam_id = "";
-}
-
-QString GameInfo::toUtf16Hex(QString str)
-{
-    QTextCodec * pTextCodec = QTextCodec::codecForName("UTF-16");
-    QByteArray ba = pTextCodec->fromUnicode(str);
-    return QString(ba.toHex());
 }
 
 TSPlayer GameInfo::getPlayer(int id)
 {
    return _players[id];
 }
-
-//QVector<TSPlayer> GameInfo::getPlayers() const
-//{
-//    return _players;
-//}
 
 GameInfo::~GameInfo()
 {
@@ -59,7 +46,7 @@ void GameInfo::setAPMR(int apm)
 }
 void GameInfo::setAPMR(double apm)
 {
-    apmRd = apm;
+    apmd = apm;
 }
 
 
@@ -105,7 +92,7 @@ QString GameInfo::get_steam_id()
     return _steam_id;
 }
 
-QString GameInfo::get_url(QString site_addr)
+QString GameInfo::get_params(QString site_addr)
 {
     // добавим имена игроков
     for(int i=0; i<_players_count; ++i)
@@ -122,10 +109,10 @@ QString GameInfo::get_url(QString site_addr)
 //                + QString::number(_players.at(i).apm) + "&";
 
         // записываем реальный apm для игрока который отправляет статистику
-        if(_sender_name==_players.at(i).name)
-            site_addr += "apm" +QString::number(i+1)+"r"+"=" + QString::number(apmRd) + "&";
+//        if(_sender_name==_players.at(i).name)
+//            site_addr += "apm"+QString::number(i+1)+"r"+"="+QString::number(apmd)+"&";
     }
-
+    site_addr += "apm"+QString::number(apmd)+"&";
     // добавим расы игроков
     for(int i=0; i<_players_count; ++i)
     {

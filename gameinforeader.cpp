@@ -7,11 +7,9 @@
 #include <QSettings>
 #include <windows.h>
 
-using namespace Network;
 
 GameInfoReader::GameInfoReader()
 {
-    _game_info = 0;
     errors_list <<"Stats processed without errors"<<                                      /* 0*/
                   "Could not open 'testStats.lua'"<<                                      /* 1*/
                   "'testStats.lua' is not readable"<<                                     /* 2*/
@@ -43,6 +41,7 @@ GameInfoReader::GameInfoReader()
     last_startgame = 0;
     last_stopgame  = 0;
     playback_error = 0;
+    _game_info = 0;
     is_playback = false;
 }
 
@@ -56,23 +55,21 @@ void GameInfoReader::set_ss_path(const QString &value)
     ss_path = value;
 }
 
-QString GameInfoReader::get_steam_id()
+void GameInfoReader::set_accounts(QMap<QString, QString> map)
 {
-    if(sender_steam_id.isEmpty())
-        return names_steamids.values().first();
-    else
-        return sender_steam_id;
+    accounts = map;
 }
 
-void GameInfoReader::set_server_addr(QString addr)
+QString GameInfoReader::get_steam_id()
 {
-    server_addr = addr;
+    return sender_steam_id;
 }
 
 int GameInfoReader::readySend()
 {
     read_warnings_log("APP -- Game Stop", -1);
 
+    qDebug() << last_playback << last_startgame << last_stopgame << playback_error;
     if(last_playback>last_stopgame)
     {
         is_playback = true;
@@ -81,7 +78,7 @@ int GameInfoReader::readySend()
     if(is_playback)
     {
         is_playback = false;
-        return 3;
+//        return 3;
     }
     if(last_startgame>last_stopgame)
         return 1;
@@ -170,33 +167,29 @@ QString GameInfoReader::get_playback_name()
     return playback_name;
 }
 
-void GameInfoReader::setAverageAPM(int apm)
-{
-    average_apm = apm;
-}
 void GameInfoReader::setTotalActions(long n)
 {
     TotalActions = n;
 }
-QString GameInfoReader::get_url(QString profile, QString path_to_playback)
+QString GameInfoReader::get_game_info(QString profile)
 {
-    int e_code = get_game_info(profile, path_to_playback);
+    int e_code = search_info(profile);
     if(e_code<errors_list.size())
         qDebug() << errors_list.at(e_code);
     else
         qDebug() << "error code is da biggest";
-    QString url;
+    QString info;
     if(e_code==0)
-        url = _game_info->get_url(server_addr+"/connect.php?");
-
-    if(e_code>=5||e_code==0)
-        delete _game_info;
-    return url;
+        info = _game_info->get_params();
+    qDebug() << "debug 1";
+    if(e_code>10) delete _game_info;
+    qDebug() << "debug 2";
+    return info;
 }
 
-int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
+int GameInfoReader::search_info(QString profile)
 {
-    if(names_steamids.isEmpty()) return error_code;
+    if(accounts.isEmpty()) return error_code;
 
     QFile file(profile + "/testStats.lua");
 
@@ -216,18 +209,18 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
     QVariantMap GSGameStats = stats.value("GSGameStats").toMap();
 
     if(!GSGameStats.contains("WinBy")) return 4;
-    if(!GSGameStats.contains("Players")) return 25;
-    if(!GSGameStats.contains("Duration")) return 5;
-    if(!GSGameStats.contains("Scenario")) return 26;
-    if(!GSGameStats.contains("Teams")) return 7;
+    if(!GSGameStats.contains("Players")) return 5;
+    if(!GSGameStats.contains("Duration")) return 6;
+    if(!GSGameStats.contains("Scenario")) return 7;
+    if(!GSGameStats.contains("Teams")) return 8;
 
     QString winby = GSGameStats.value("WinBy").toString();    // условие победы
     int players_count = GSGameStats.value("Players").toInt(); // количество игроков
     int duration = GSGameStats.value("Duration").toInt();     // продолжительность игры
     int team_num = GSGameStats.value("Teams").toInt();
 
-    if(team_num!=2) return 8;
-    if(duration<MINIMUM_DURATION) return 6;
+    if(team_num!=2) return 9;
+    if(duration<MINIMUM_DURATION) return 10;
 
     double AverageAPM = (double)TotalActions*60.0f/(double)duration;
     qDebug() << "WinBy:" << winby.toUpper();
@@ -260,12 +253,12 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
         teams[player.value("PTeam").toInt()]++;
 
         p_name = player.value("PName").toString();
-        if(names_steamids.keys().contains(p_name))
+        if(accounts.keys().contains(p_name))
         {
             _game_info->set_sender_name(p_name);
             _game_info->setAPMR(AverageAPM);
             if(sender_steam_id.isEmpty())
-                sender_steam_id = names_steamids.value(p_name);
+                sender_steam_id = accounts.value(p_name);
             _game_info->set_steam_id(sender_steam_id);
             fnl_state = player.value("PFnlState").toInt();
             sender_id = i;
@@ -279,7 +272,7 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                                    player.value("PTeam").toInt(), fnl_state/*, rep_reader.GetAverageAPM(i)*/);
     }
 
-    if(!sender_is_player) return 23;
+//    if(!sender_is_player) return 23;
     // если количество игроков в первой команде равно количеству игроков во второй команде,
     // то тип игры равен количеству игроков в одной из команд
 //    qDebug() << teams[0] << teams[1];
@@ -304,15 +297,18 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
                 }
         }
     }
-    if(winners_count!=game_type) return 24;
-
+    // раньше это условие срабартывало когда игрок ливал и мы не отправляли статистику,
+    // теперь же, статистика будет отправлять даже в тако случе
+//    if(winners_count!=game_type) return 24;
+    _game_info->set_winby(winby.isEmpty()?"disconnect":winby);
     _playback.clear();
+    QString mapName;
     if(last_startgame > playback_error)
     {
         RepReader rep_reader;
         qDebug() << "playback reading";
         // откроем реплей файл последней игры для чтения
-        QFile pfile(path_to_playback+"temp.rec");
+        QFile pfile(ss_path+"/Playback/temp.rec");
         if(!pfile.open(QIODevice::ReadWrite))
             return 16;
 
@@ -324,6 +320,19 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 
         // переименовываем название реплея в игре по стандарту
         playback_name = rep_reader.RenameReplay()+".rec";
+        QFile mapnames('mapnames.txt');
+        if(mapnames.open(QIODevice::ReadOnly))
+        {
+            QTextStream textStream(&mapnames);
+            QString file = textStream.readAll();
+            QString ref = rep_reader.getMapLocale().remove('$');
+            foreach(QString line, file.split('\n'))
+                if(line.contains(ref))
+                {
+                    mapName = line.mid(ref.size(), line.indexOf(' ')-line.indexOf(')'));
+                }
+        }
+        qDebug() << mapName;
         qDebug() << playback_name;
         pfile.seek(0);
         _playback = pfile.readAll();
@@ -332,9 +341,12 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
 
         if(!rep_reader.isStandart(game_type))
             return 22;
-
+        // теперь, если игрок обозреватель, то пусть отправляет статистику как ливер
+        // все таки обозреватель может ливнуть в любой момент и реплей может быть не полным
+        // но зато хоть какой-то реплей будет
         if(rep_reader.playerIsObserver(_game_info->get_sender_name()))
-            return 23;
+//            return 23;
+            _game_info->set_winby("disconnect");
     }
     else
         qDebug() << "REC -- Error opening file playback:temp.rec for write";
@@ -344,81 +356,10 @@ int GameInfoReader::get_game_info(QString profile, QString path_to_playback)
     _game_info->set_type(game_type);
     _game_info->set_team_number(team_num);
     _game_info->set_duration(duration);
-    _game_info->set_map_name(GSGameStats.value("Scenario").toString());
+    _game_info->set_map_name(mapName.isEmpty()?GSGameStats.value("Scenario").toString():mapName);
     _game_info->set_mod_name(mod_name);
-    _game_info->set_winby(winby.isEmpty()?"disconnect":winby);
 
     return 0;
-}
-
-bool GameInfoReader::init_player()
-{
-    RequestSender sender;
-    QString player_name;
-    QDir userdata_dir(QCoreApplication::applicationDirPath());
-
-    QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Valve\\Steam\\", QSettings::NativeFormat);
-
-    QString steam_path =  settings.value("InstallPath").toString();
-    if(steam_path.isEmpty())
-    {
-        QSettings settings_second("HKEY_CURRENT_USER\\Software\\Valve\\Steam", QSettings::NativeFormat);
-        steam_path = settings_second.value("SteamPath").toString();
-    }
-    QString reg_url = server_addr+"/regplayer.php?&key="+QLatin1String(SERVER_KEY)+"&";
-    int i=0;
-    if(!userdata_dir.cd(steam_path + "/userdata"))
-    {
-        qDebug() << errors_list.at(9);
-        return false;
-    }
-
-    foreach (QString name, userdata_dir.entryList())
-    {
-        if(name!="."&&name!="..")
-        {
-            userdata_dir.cd(name);
-            if(userdata_dir.entryList().contains("9450"))
-            {
-                QString account_id64_str = QString::number(76561197960265728 + name.toInt());
-                QString url = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+account_id64_str+"&format=json";
-                Request request(url);
-                QByteArray steam_response = sender.getWhileSuccess(request);
-                QVariantMap player_info = QtJson::json_to_map(steam_response);
-                if(player_info.contains("response"))
-                {
-                    QVariantMap response = player_info.value("response").toMap();
-                    if(response.contains("players"))
-                    {
-                        QVariantList players = response.value("players").toList();
-                        if(!players.isEmpty())
-                            if(players.at(0).toMap().contains("personaname"))
-                            {
-                                player_name = players.at(0).toMap().value("personaname").toString();
-                                names_steamids.insert(player_name, account_id64_str);
-                                qDebug() << "Steam ID associated with Soulstorm:" << account_id64_str << player_name;
-                                QString hex_name(player_name.toUtf8().toHex());
-                                QString num = QString::number(i);
-                                reg_url += "name"+num+"="+hex_name+"&sid"+num+"="+account_id64_str+"&";
-                                ++i;
-                            }
-                    }
-
-                }
-
-            }
-            userdata_dir.cdUp();
-        }
-    }
-
-    if(names_steamids.isEmpty()) return false;
-
-    qDebug() << reg_url;
-    Request request_to_server(reg_url);
-    QByteArray response_fromstat = sender.getWhileSuccess(request_to_server);
-    qDebug() << "registration in dowstats: " << QString::fromUtf8(response_fromstat.data());
-
-    return true;
 }
 
 QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int count/*=1*/)
