@@ -12,7 +12,7 @@ QMAKE_CXXFLAGS += -std=c++11
 CONFIG -= console
 
 TEMPLATE = lib
-CONFIG += dll
+#CONFIG += dll
 
 
 TARGET = SSStats
@@ -50,7 +50,8 @@ SOURCES +=     main.cpp \
     repreader.cpp \
     extendedbinreader.cpp \
 #    languageservice.cpp \
-    apmmeter.cpp
+    apmmeter.cpp \
+    systemwin32.cpp
 #ssstats.cpp \
 
 
@@ -68,7 +69,8 @@ HEADERS += request.h \
     repreader.h \
     extendedbinreader.h \
 #    languageservice.h \
-    apmmeter.h
+    apmmeter.h \
+    systemwin32.h
 #ssstats.h\
 #        ssstats_global.h \
 

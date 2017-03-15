@@ -7,7 +7,6 @@
 #include <QSettings>
 #include <windows.h>
 
-
 GameInfoReader::GameInfoReader()
 {
     errors_list <<"Stats processed without errors"<<                                      /* 0*/
@@ -16,27 +15,27 @@ GameInfoReader::GameInfoReader()
                   "Stats file does not contain 'GSGameStats'"<<                           /* 3*/
                   "GSGameStats does not contain 'WinBy'"<<                                /* 4*/
                   "GSGameStats does not contain 'Duration'"<<                             /* 5*/
-                  "Current game is still in progress"<<                                   /* 6*/
-                  "GSGameStats does not contain 'Teams'"<<                                /* 7*/
-                  "Unsupported type of game. The number of teams is not equals two."<<    /* 8*/
-                  "'userdata' is not exists or is not readable"<<                         /* 9*/
-                  "'userdata' folder is empty"<<                                          /*10*/
-                  "'account_id32_str' is Null"<<                                          /*11*/
-                  "Steam response does not contain response"<<                            /*12*/
-                  "Steam response does not contain players"<<                             /*13*/
-                  "Players list is empty"<<                                               /*14*/
-                  "Steam response does not contain personaname"<<                         /*15*/
+                  "GSGameStats does not contain Players"<<                                /* 6*/
+                  "GSGameStats does not contain Scenario"<<                               /* 7*/
+                  "GSGameStats does not contain 'Teams'"<<                                /* 8*/
+                  "Unsupported type of game. The number of teams is not equals two."<<    /* 9*/
+                  "Current game is still in progress"<<                                   /*10*/
+                  "GSGameStats does not contain player id"<<                              /*11*/
+                  "Player does not contain 'PHuman'"<<                                    /*12*/
+                  "Player is not human"<<                                                 /*13*/
+                  "Player does not contain players info"<<                                /*14*/
+                  "Unsupported type of game. Number of players per team is not equal."<<  /*15*/
                   "Could not open 'temp.rec'"<<                                           /*16*/
-                  "GSGameStats does not contain player id"<<                              /*17*/
-                  "Player does not contain 'PHuman'"<<                                    /*18*/
-                  "Player is not human"<<                                                 /*19*/
-                  "Player does not contain players info"<<                                /*20*/
-                  "Unsupported type of game. Number of players per team is not equal."<<  /*21*/
-                  "Game options is not standart"<<                                        /*22*/
-                  "Sender is not player"<<                                                /*23*/
-                  "Winners count less than game type"<<                                   /*24*/
-                  "GSGameStats does not contain Players"<<                                 /*25*/
-                  "GSGameStats does not contain Scenario";                                /*26*/
+                  "Game options is not standart";                                         /*17*/
+//                  "'userdata' is not exists or is not readable"<<                         /* 9*/
+//                  "'userdata' folder is empty"<<                                          /*10*/
+//                  "'account_id32_str' is Null"<<                                          /*11*/
+//                  "Steam response does not contain response"<<                            /*12*/
+//                  "Steam response does not contain players"<<                             /*13*/
+//                  "Players list is empty"<<                                               /*14*/
+//                  "Steam response does not contain personaname"<<                         /*15*/
+//                  "Sender is not player"<<
+//                  "Winners count less than game type"<<                                   /*26*/
     last_playback  = 0;
     last_startgame = 0;
     last_stopgame  = 0;
@@ -69,7 +68,7 @@ int GameInfoReader::readySend()
 {
     read_warnings_log("APP -- Game Stop", -1);
 
-    qDebug() << last_playback << last_startgame << last_stopgame << playback_error;
+//    qDebug() << last_playback << last_startgame << last_stopgame << playback_error;
     if(last_playback>last_stopgame)
     {
         is_playback = true;
@@ -208,11 +207,11 @@ int GameInfoReader::search_info(QString profile)
     if(!stats.contains("GSGameStats")) return 3;
     QVariantMap GSGameStats = stats.value("GSGameStats").toMap();
 
-    if(!GSGameStats.contains("WinBy")) return 4;
-    if(!GSGameStats.contains("Players")) return 5;
-    if(!GSGameStats.contains("Duration")) return 6;
-    if(!GSGameStats.contains("Scenario")) return 7;
-    if(!GSGameStats.contains("Teams")) return 8;
+    if(!GSGameStats.contains("WinBy"    )) return 4;
+    if(!GSGameStats.contains("Duration" )) return 5;
+    if(!GSGameStats.contains("Players"  )) return 6;
+    if(!GSGameStats.contains("Scenario" )) return 7;
+    if(!GSGameStats.contains("Teams"    )) return 8;
 
     QString winby = GSGameStats.value("WinBy").toString();    // условие победы
     int players_count = GSGameStats.value("Players").toInt(); // количество игроков
@@ -236,19 +235,14 @@ int GameInfoReader::search_info(QString profile)
     for(int i=0; i<players_count;++i)
     {
         QString player_id = "player_"+QString::number(i);
-        if(!GSGameStats.contains(player_id))
-        {
-            qDebug() << "GSGameStats does not contain" << player_id;
-            return 17;
-        }
+        if(!GSGameStats.contains(player_id)) return 11;
         QVariantMap player = GSGameStats.value(player_id).toMap();
-        if(!player.contains("PHuman"))
-            return 18;
+        if(!player.contains("PHuman")) return 12;
 //        if(player.value("PHuman").toInt()!=1)
-//            return 19;
+//            return 13;
         if(!(player.contains("PName")&&player.contains("PRace")
                 &&player.contains("PFnlState")&&player.contains("PTeam")))
-            return 20;
+            return 14;
 
         teams[player.value("PTeam").toInt()]++;
 
@@ -276,7 +270,7 @@ int GameInfoReader::search_info(QString profile)
     // если количество игроков в первой команде равно количеству игроков во второй команде,
     // то тип игры равен количеству игроков в одной из команд
 //    qDebug() << teams[0] << teams[1];
-    if(teams[0]!=teams[1]) return 21;
+    if(teams[0]!=teams[1]) return 15;
 
     if(winby.isEmpty())
     {
@@ -302,7 +296,6 @@ int GameInfoReader::search_info(QString profile)
 //    if(winners_count!=game_type) return 24;
     _game_info->set_winby(winby.isEmpty()?"disconnect":winby);
     _playback.clear();
-    QString mapName;
     if(last_startgame > playback_error)
     {
         RepReader rep_reader;
@@ -320,19 +313,6 @@ int GameInfoReader::search_info(QString profile)
 
         // переименовываем название реплея в игре по стандарту
         playback_name = rep_reader.RenameReplay()+".rec";
-        QFile mapnames('mapnames.txt');
-        if(mapnames.open(QIODevice::ReadOnly))
-        {
-            QTextStream textStream(&mapnames);
-            QString file = textStream.readAll();
-            QString ref = rep_reader.getMapLocale().remove('$');
-            foreach(QString line, file.split('\n'))
-                if(line.contains(ref))
-                {
-                    mapName = line.mid(ref.size(), line.indexOf(' ')-line.indexOf(')'));
-                }
-        }
-        qDebug() << mapName;
         qDebug() << playback_name;
         pfile.seek(0);
         _playback = pfile.readAll();
@@ -340,7 +320,7 @@ int GameInfoReader::search_info(QString profile)
         pfile.close();
 
         if(!rep_reader.isStandart(game_type))
-            return 22;
+            return 17;
         // теперь, если игрок обозреватель, то пусть отправляет статистику как ливер
         // все таки обозреватель может ливнуть в любой момент и реплей может быть не полным
         // но зато хоть какой-то реплей будет
@@ -356,7 +336,7 @@ int GameInfoReader::search_info(QString profile)
     _game_info->set_type(game_type);
     _game_info->set_team_number(team_num);
     _game_info->set_duration(duration);
-    _game_info->set_map_name(mapName.isEmpty()?GSGameStats.value("Scenario").toString():mapName);
+    _game_info->set_map_name(GSGameStats.value("Scenario").toString());
     _game_info->set_mod_name(mod_name);
 
     return 0;

@@ -10,6 +10,8 @@
 #include "apmmeter.h"
 #include <QCoreApplication>
 
+#define STEAM_API_KEY "B09655A1E41B5DE93AD3F27087D25884"
+
 class StatsCollector : public QObject
 {
     Q_OBJECT
@@ -31,6 +33,7 @@ private:
     bool init_player();
     bool send_stats(QString path_to_profile);
     bool send_logfile();
+    bool disableFog();
     int updateUpdater();
     QMap<QString, QString> accounts;
     QString server_addr;

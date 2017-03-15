@@ -10,6 +10,7 @@
 #include <string>
 #include <iostream>
 #include <QCryptographicHash>
+#include "systemwin32.h"
 
 StatsCollector::StatsCollector(QObject* pobj /*=0*/)
     :QObject(pobj)
@@ -47,18 +48,20 @@ void StatsCollector::start()
     QSettings settings("stats.ini", QSettings::IniFormat);
 
     // получаем из файла конфигураций данные о размере буфера
-    bool enablestats = settings.value("settings/enablestats", true).toBool();
-//    bool apmmeter = settings.value("settings/apmmeter", true).toBool();
-    bool sendreplays = settings.value("settings/sendreplays", true).toBool();
     version = settings.value("info/version", "0.0.0").toString();
-    server_addr = settings.value("settings/serveraddr", "http://www.dowstats.h1n.ru/").toString();
+    server_addr = settings.value("settings/serverAddr", "http://www.dowstats.h1n.ru/").toString();
+    bool enableStats = settings.value("settings/enableStats", true).toBool();
+    bool sendReplays = settings.value("settings/sendReplays", true).toBool();
+    bool fog = settings.value("settings/disableFog", true).toBool();
+
     qDebug() << "stats version:" << version;
     qDebug() << "server address:" << server_addr;
-    if(!enablestats)
+    if(!enableStats)
     {
         qDebug() << "stats is disabled";
         return;
     }
+    if(fog) disableFog();
 
 
 //    QString filename="SSStatsUpdater.dll";
@@ -131,6 +134,8 @@ void StatsCollector::start()
 //    else
 //        delete thread;
 
+    systemWin32 processesInWin;
+
     qDebug() << "start";
     QString cur_profile, params;
 //    int n=0;long avrAPM, TotalActions;
@@ -170,13 +175,23 @@ void StatsCollector::start()
 //                    }
                     qDebug() << "debug 3";
                     if(!params.isEmpty())
-                        if(sendreplays)
+                    {
+                        if(sendReplays)
+                        {
+                            qDebug() << "send stats with reply";
                             emit sendfile(server_addr+"/connect.php?"+params,
                                           reader->get_playback_name(),
                                           "application/octet-stream",
                                           reader->get_playback_file());
+                        }
                         else
+                        {
+                            qDebug() << "send stats without reply";
                             emit get(server_addr+"/connect.php?"+params);
+                        }
+                    }
+                    else
+                        qDebug() << "params is empty";
                     qDebug() << "debug 4";
                     break;
                 // игра не завершилась
@@ -213,7 +228,10 @@ void StatsCollector::start()
             // отправим лог файлы
             send_logfile();
             Sleep(10000);
-//            ++n;
+            // проверим есть ли процесс игры в списке запущенных
+            // если нет, то завершим работу программы
+            if(!processesInWin.findProcess("soulstorm.exe"))
+                stop = true;
         }
     }
     if(thread->isRunning())
@@ -292,6 +310,23 @@ int StatsCollector::updateUpdater()
 void StatsCollector::slotDone(const QUrl &url, const QByteArray &btr)
 {
     qDebug() << "From:" << url;
+}
+
+bool StatsCollector::disableFog()
+{
+    DWORD target = 0x008282F0;
+    BYTE fog_toggle[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+    const char *title = "Dawn of War: Soulstorm";
+    int len = strlen(title)+1;
+    wchar_t *wText = new wchar_t(len);
+    if (wText == 0) return -1;
+    MultiByteToWideChar(  CP_ACP, NULL,title, -1, wText,len );
+    HWND hWnd = FindWindow(NULL, wText);
+    DWORD PID = GetWindowThreadProcessId(hWnd, &PID);
+    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, PID);
+    if(WriteProcessMemory(hProcess, (PVOID)target, fog_toggle, 6, NULL)!=0)
+        return true;
+    return false;
 }
 
 QString StatsCollector::calcMD5(QString fileName)

@@ -167,8 +167,8 @@ void RequestSender::upload(QString url, QString name, QString content, QByteArra
 //    config.setCaCertificates(certs);
 //    request.setSslConfiguration(config);
     req.setRawHeader("User-Agent", "SSStats");
-    qDebug() << req.header(QNetworkRequest::ContentLengthHeader).toString();
-    qDebug() << req.header(QNetworkRequest::ContentTypeHeader).toString();
+//    qDebug() << req.header(QNetworkRequest::ContentLengthHeader).toString();
+//    qDebug() << req.header(QNetworkRequest::ContentTypeHeader).toString();
 //    foreach(QByteArray str, req.rawHeaderList())
 //        qDebug() << QString::fromUtf8(str.data());
 //    qDebug() << QString::fromUtf8(request.data(false).data());
@@ -185,14 +185,15 @@ void RequestSender::slotFinished(QNetworkReply* pnr)
                  << pnr->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
 //    foreach(QByteArray str, pnr->rawHeaderList())
 //        qDebug() << QString::fromUtf8(str.data());
-    qDebug() << pnr->size() << pnr->url();
+//    qDebug() << pnr->size() << pnr->url();
 //    else
 //        emit done(pnr->url(), pnr->readAll());
 //    qDebug() << pnr->isReadable() << pnr->isFinished();
 
     QString reply = QString::fromUtf8(pnr->readAll().data());
-    if(!reply.isEmpty())
-        qDebug() << reply;
+    if(reply.isEmpty())
+        qDebug() << "reply is empty";
+//        qDebug() << reply;
     pnr->deleteLater();
 }
 

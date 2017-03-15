@@ -112,7 +112,7 @@ QString GameInfo::get_params(QString site_addr)
 //        if(_sender_name==_players.at(i).name)
 //            site_addr += "apm"+QString::number(i+1)+"r"+"="+QString::number(apmd)+"&";
     }
-    site_addr += "apm"+QString::number(apmd)+"&";
+    site_addr += "apm="+QString::number(apmd)+"&";
     // добавим расы игроков
     for(int i=0; i<_players_count; ++i)
     {

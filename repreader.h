@@ -18,7 +18,6 @@ public:
 
     QString RenameReplay();
     QString RenameReplay(Replay *rep);
-    QString getMapLocale();
     bool isStandart(int game_type);
     bool playerIsObserver(QString name);
     int GetAverageAPM(int id);

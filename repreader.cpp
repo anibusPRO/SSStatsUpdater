@@ -478,11 +478,6 @@ bool RepReader::isStandart(int game_type)
     return true;
 }
 
-QString RepReader::getMapLocale()
-{
-    return replay->MapLocale;
-}
-
 int RepReader::FindString(QString str, int max_offset)
 {
     QString temp_str("");

@@ -16,9 +16,7 @@
 #   include "json.h"
 #endif
 
-#define STEAM_API_KEY "B09655A1E41B5DE93AD3F27087D25884"
-
-#define MINIMUM_DURATION 30
+#define MINIMUM_DURATION 60
 
 
 class GameInfoReader
