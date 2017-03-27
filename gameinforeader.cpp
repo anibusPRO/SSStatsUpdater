@@ -19,7 +19,7 @@ GameInfoReader::GameInfoReader()
                   "GSGameStats does not contain Scenario"<<                               /* 7*/
                   "GSGameStats does not contain 'Teams'"<<                                /* 8*/
                   "Unsupported type of game. The number of teams is not equals two."<<    /* 9*/
-                  "Current game is still in progress"<<                                   /*10*/
+                  "Player left the game"<<                                   /*10*/
                   "GSGameStats does not contain player id"<<                              /*11*/
                   "Player does not contain 'PHuman'"<<                                    /*12*/
                   "Player is not human"<<                                                 /*13*/
@@ -42,6 +42,7 @@ GameInfoReader::GameInfoReader()
     playback_error = 0;
     _game_info = 0;
     is_playback = false;
+    profile_error = true;
 }
 
 GameInfoReader::~GameInfoReader()
@@ -87,7 +88,6 @@ int GameInfoReader::readySend()
 QString GameInfoReader::get_cur_profile_dir()
 {
     QDir temp_dir(ss_path+"/Profiles");
-
     QString name;
     name = read_warnings_log("Using player profile", 3, 5);
     int n=0;
@@ -98,7 +98,6 @@ QString GameInfoReader::get_cur_profile_dir()
         n++;
     }
     QString profile = "Profile1";
-
     // если имя профиля не изменилось, то отправим пустую строку, как знак того что профиль не сменился
     if(name.isEmpty())
         return QString(ss_path +"/Profiles/"+ profile);
@@ -106,7 +105,6 @@ QString GameInfoReader::get_cur_profile_dir()
         qDebug() << "cur profile name:" << name << cur_profile_name;
 
     QStringList profiles = temp_dir.entryList();
-
     if(!profiles.isEmpty())
         foreach (QString file, profiles)
         {
@@ -131,8 +129,12 @@ QString GameInfoReader::get_cur_profile_dir()
                         }
                         else
                         {
-                            qDebug() << temp_dir.path() << file;
-                            qDebug() << "Could not open name.dat";
+                            if(profile_error)
+                            {
+                                qDebug() << temp_dir.path();
+                                qDebug() << "Could not open name.dat";
+                                profile_error = false;
+                            }
                             temp_dir.cdUp();
                             continue;
                         }
@@ -142,8 +144,11 @@ QString GameInfoReader::get_cur_profile_dir()
                             cur_profile_name = str;
                             break;
                         }
-                        else
+                        else if(profile_error)
+                        {
                             qDebug() << name << str;
+                            profile_error = false;
+                        }
                         temp_dir.cdUp();
                     }
                     else
@@ -180,9 +185,7 @@ QString GameInfoReader::get_game_info(QString profile)
     QString info;
     if(e_code==0)
         info = _game_info->get_params();
-    qDebug() << "debug 1";
     if(e_code>10) delete _game_info;
-    qDebug() << "debug 2";
     return info;
 }
 
@@ -201,18 +204,22 @@ int GameInfoReader::search_info(QString profile)
     while(file.read(1)!="G")
         k++;
     file.seek(k);
-    QVariantMap stats = QtJson::to_map(file.readAll());
+    QByteArray testStats = file.readAll();
+    QVariantMap stats = QtJson::to_map(testStats);
     file.close();
-
-    if(!stats.contains("GSGameStats")) return 3;
+    int parse_res = 0;
+    if(!stats.contains("GSGameStats")) parse_res = 3;
     QVariantMap GSGameStats = stats.value("GSGameStats").toMap();
 
-    if(!GSGameStats.contains("WinBy"    )) return 4;
-    if(!GSGameStats.contains("Duration" )) return 5;
-    if(!GSGameStats.contains("Players"  )) return 6;
-    if(!GSGameStats.contains("Scenario" )) return 7;
-    if(!GSGameStats.contains("Teams"    )) return 8;
-
+    if(!GSGameStats.contains("WinBy"    )) parse_res = 4;
+    if(!GSGameStats.contains("Duration" )) parse_res = 5;
+    if(!GSGameStats.contains("Players"  )) parse_res = 6;
+    if(!GSGameStats.contains("Scenario" )) parse_res = 7;
+    if(!GSGameStats.contains("Teams"    )) parse_res = 8;
+    if(parse_res!=0){
+        qDebug() << testStats;
+        return parse_res;
+    }
     QString winby = GSGameStats.value("WinBy").toString();    // условие победы
     int players_count = GSGameStats.value("Players").toInt(); // количество игроков
     int duration = GSGameStats.value("Duration").toInt();     // продолжительность игры
@@ -228,18 +235,18 @@ int GameInfoReader::search_info(QString profile)
     _game_info = new GameInfo(players_count);
 
     // если настройки игры стандартные, то отправим статистику
-    int game_type=players_count/2, teams[8] = {0};
-    int fnl_state, sender_id, winners_count=0;
+    int teams[8] = {0};
+    int fnl_state, sender_id=-1, winners_count=0;
     QString p_name;
-    bool sender_is_player = false;
+//    bool sender_is_player = false;
     for(int i=0; i<players_count;++i)
     {
         QString player_id = "player_"+QString::number(i);
         if(!GSGameStats.contains(player_id)) return 11;
         QVariantMap player = GSGameStats.value(player_id).toMap();
         if(!player.contains("PHuman")) return 12;
-//        if(player.value("PHuman").toInt()!=1)
-//            return 13;
+        if(player.value("PHuman").toInt()!=1)
+            return 13;
         if(!(player.contains("PName")&&player.contains("PRace")
                 &&player.contains("PFnlState")&&player.contains("PTeam")))
             return 14;
@@ -249,14 +256,11 @@ int GameInfoReader::search_info(QString profile)
         p_name = player.value("PName").toString();
         if(accounts.keys().contains(p_name))
         {
+            sender_steam_id = accounts.value(p_name);
             _game_info->set_sender_name(p_name);
-            _game_info->setAPMR(AverageAPM);
-            if(sender_steam_id.isEmpty())
-                sender_steam_id = accounts.value(p_name);
-            _game_info->set_steam_id(sender_steam_id);
             fnl_state = player.value("PFnlState").toInt();
             sender_id = i;
-            sender_is_player = true;
+//            sender_is_player = true;
         }
         else
             fnl_state = player.value("PFnlState").toInt();
@@ -271,8 +275,8 @@ int GameInfoReader::search_info(QString profile)
     // то тип игры равен количеству игроков в одной из команд
 //    qDebug() << teams[0] << teams[1];
     if(teams[0]!=teams[1]) return 15;
-
-    if(winby.isEmpty())
+    int game_type = teams[0];
+    if(sender_id!=-1&&winby.isEmpty())
     {
         int sender_team = _game_info->getPlayer(sender_id).team;
         int loseleavers=1;
@@ -333,6 +337,10 @@ int GameInfoReader::search_info(QString profile)
 
     QString mod_name = read_warnings_log("MOD -- Initializing Mod", 4);  // имя запущенного мода
 
+    if(sender_steam_id.isEmpty())
+        sender_steam_id = accounts.values().first();
+    _game_info->set_steam_id(sender_steam_id);
+    _game_info->set_APMR(AverageAPM);
     _game_info->set_type(game_type);
     _game_info->set_team_number(team_num);
     _game_info->set_duration(duration);
@@ -391,13 +399,14 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
                 // к примеру если передали Game Start, то получим Game
                 first_word = str.split(" ")[0];
             // если в списке полученном из текущей строки есть искомое слово
-            if(list.contains(first_word))
+            if(list.contains(first_word)){
                 // пишем в вывод строку из списка с отступом, переданном в параметре
                 if(list.indexOf(first_word)!=-1)
                     for(int i=list.indexOf(first_word)+offset, j=0; i<list.size()&&j<count; ++i, ++j)
                         out += list[i] + " ";
                 else
                     qDebug() << "out of range" << first_word << str << counter;
+            }
             if(out!="")
                 out = out.left(out.size()-1);
 

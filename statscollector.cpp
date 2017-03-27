@@ -50,47 +50,39 @@ void StatsCollector::start()
     // получаем из файла конфигураций данные о размере буфера
     version = settings.value("info/version", "0.0.0").toString();
     server_addr = settings.value("settings/serverAddr", "http://www.dowstats.h1n.ru/").toString();
-    bool enableStats = settings.value("settings/enableStats", true).toBool();
-    bool sendReplays = settings.value("settings/sendReplays", true).toBool();
-    bool fog = settings.value("settings/disableFog", true).toBool();
+    bool fog = settings.value("settings/disableFog", false).toBool();
+    bool showHP = settings.value("settings/showHP", false).toBool();
 
     qDebug() << "stats version:" << version;
     qDebug() << "server address:" << server_addr;
-    if(!enableStats)
+
+
+    QString filename="SSStatsUpdater.dll";
+    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY) ;
+    Request request(url + "&name=ssstats.md5&");
+    QByteArray btar = sender->get(request);
+    QString md5 = QString::fromUtf8(btar.data());
+    qDebug() << "stats updater md5 checking...";
+    if(!md5.contains(calcMD5(filename)))
     {
-        qDebug() << "stats is disabled";
-        return;
+        // код который получает программу для автообновления, создает bat файл и запускает процесс, его выполняющий
+        // bat файл удаляет старую программу для автообновления, а затем переименовывает скачанную новую
+        request.setAddress(url+"&name="+filename+"&");
+        bool success = true;
+        QByteArray btar = sender->getWhileSuccess(request);
+        qDebug() << filename << "successfully downloaded";
+
+        QFile cur_file("SSStatsUpdaterTemp.dll");
+        if(cur_file.open(QIODevice::WriteOnly))
+        {
+            cur_file.write(btar);
+            cur_file.close();
+        }
+        else
+            success = false;
+        if(success)
+            updateUpdater();
     }
-    if(fog) disableFog();
-
-
-//    QString filename="SSStatsUpdater.dll";
-//    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY) ;
-//    Request request(url + "&name=ssstats.md5&");
-//    QByteArray btar = sender->get(request);
-//    QString md5 = QString::fromUtf8(btar.data());
-//    qDebug() << "stats updater md5 checking...";
-//    if(!md5.contains(calcMD5(filename)))
-//    {
-//        // код который получает программу для автообновления, создает bat файл и запускает процесс, его выполняющий
-//        // bat файл удаляет старую программу для автообновления, а затем переименовывает скачанную новую
-//        request.setAddress(url+"&name="+filename+"&");
-//        bool success = true;
-//        QByteArray btar = sender->getWhileSuccess(request);
-//        qDebug() << filename << "successfully downloaded";
-
-//        QFile cur_file("SSStatsUpdaterTemp.dll");
-//        if(cur_file.open(QIODevice::WriteOnly))
-//        {
-//            cur_file.write(btar);
-//            cur_file.close();
-//        }
-//        else
-//            success = false;
-//        if(success)
-//            updateUpdater();
-//    }
-
     qDebug() << "Player initialization";
     if(!init_player())
     {
@@ -139,60 +131,41 @@ void StatsCollector::start()
     qDebug() << "start";
     QString cur_profile, params;
 //    int n=0;long avrAPM, TotalActions;
-    while(!stop)
-    {
-        TSinfo.refresh();
-        last_time = TSinfo.lastModified();
+
+
+    while(!stop){
+        bool enableStats = settings.value("settings/enableStats", true).toBool();
+        if(enableStats){
+            TSinfo.refresh();
+            last_time = TSinfo.lastModified();
+        }
         // если время последнего изменения файла больше предыдущего
-        if(last_time > old_time)
-        {
-            switch (reader->readySend())
-            {
+        if((last_time>old_time)&&old_time.msecsTo(last_time)>30000){
+            switch (reader->readySend()){
                 // если рузультат вызова 0, то это означает что игра завершилась и она не реплей
                 case 0:
                     apm_meter->stop();
                     qDebug() << "Game Stop";
-//                    TotalActions = apm_meter->getTotalActions();
-//                    avrAPM = apm_meter->getAverageAPM();
-//                    qDebug() << "Current:" << apm_meter->getCurrentAPM()
-//                             << "Average:" << avrAPM
-//                             << "Max:" << apm_meter->getMaxAPM()
-//                             << "Time:" << (double)apm_meter->getTime()/1000.0f/60.0f << "min"
-//                             << "Total Actions:" << TotalActions;
 
                     reader->setTotalActions(apm_meter->getTotalActions());
                     params = reader->get_game_info(path_to_profile);
-//                    if(!params.isEmpty())
-//                    {
-//                        Request request(server_addr+"/connect.php?"+params);
-//                        if(request.setFile(reader->get_playback_file(),
-//                                        "replay",
-//                                        reader->get_playback_name(),
-//                                        "application/octet-stream"))
-//                            qDebug() << "Отправка статистики с реплеем. Ответ от сервера:\n" << QString::fromUtf8(sender->postWhileSuccess(request).data());
-//                        else
-//                            qDebug() << "Отправка статистики без реплея. Ответ от сервера:\n" << QString::fromUtf8(sender->getWhileSuccess(request).data());
-//                    }
-                    qDebug() << "debug 3";
-                    if(!params.isEmpty())
-                    {
-                        if(sendReplays)
-                        {
+
+                    if(!params.isEmpty()){
+                        bool sendReplays = settings.value("settings/sendReplays", true).toBool();
+                        if(sendReplays){
                             qDebug() << "send stats with reply";
                             emit sendfile(server_addr+"/connect.php?"+params,
                                           reader->get_playback_name(),
                                           "application/octet-stream",
                                           reader->get_playback_file());
                         }
-                        else
-                        {
+                        else{
                             qDebug() << "send stats without reply";
                             emit get(server_addr+"/connect.php?"+params);
                         }
                     }
                     else
                         qDebug() << "params is empty";
-                    qDebug() << "debug 4";
                     break;
                 // игра не завершилась
                 case 1:
@@ -201,7 +174,7 @@ void StatsCollector::start()
                     if(apm_meter->stop_flag)
                         emit start_meter();
 
-                    // ждем пока игра не закончится
+                    // ждем пока закончится игра
                     while(reader->readySend()!=0)
                         Sleep(5000);
                     break;
@@ -218,8 +191,7 @@ void StatsCollector::start()
         else
         {
             cur_profile = reader->get_cur_profile_dir();
-            if((!cur_profile.isNull())&&path_to_profile != cur_profile)
-            {
+            if((!cur_profile.isNull())&&path_to_profile!=cur_profile){
                 path_to_profile = cur_profile;
                 TSinfo.setFile(path_to_profile + "/testStats.lua");
                 old_time = TSinfo.lastModified();
@@ -228,14 +200,22 @@ void StatsCollector::start()
             // отправим лог файлы
             send_logfile();
             Sleep(10000);
+
+            if(fog)
+                if(disableFog(showHP)){
+                    qDebug() << "fog disabled";
+                    fog = false;
+                }
+
             // проверим есть ли процесс игры в списке запущенных
             // если нет, то завершим работу программы
-            if(!processesInWin.findProcess("soulstorm.exe"))
-                stop = true;
+//            if(!processesInWin.findProcess("SoulstormN.exe")){
+//                qDebug() << "process not found";
+//                stop = true;
+//            }
         }
     }
-    if(thread->isRunning())
-    {
+    if(thread->isRunning()){
         apm_meter->stop();
         thread->wait();
     }
@@ -260,12 +240,6 @@ bool StatsCollector::send_logfile()
         if(result)
         {
             QString url = server_addr+"/logger.php?key="+QLatin1String(SERVER_KEY)+"&steamid="+steamid+"&version="+version.remove(".")+"&type="+QString::number(i);
-//            Request request(url);
-//            request.setFile(log.readAll(),
-//                            "logfile",
-//                            steamid+".log",
-//                            "text/txt");
-//            sender->post(request);
             emit sendfile(url, steamid+".log", "text/txt", log.readAll());
             log.close();
         }
@@ -312,21 +286,43 @@ void StatsCollector::slotDone(const QUrl &url, const QByteArray &btr)
     qDebug() << "From:" << url;
 }
 
-bool StatsCollector::disableFog()
+bool StatsCollector::disableFog(bool showHP)
 {
     DWORD target = 0x008282F0;
+    DWORD hpbars_target = 0x00956596;
     BYTE fog_toggle[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
-    const char *title = "Dawn of War: Soulstorm";
-    int len = strlen(title)+1;
-    wchar_t *wText = new wchar_t(len);
-    if (wText == 0) return -1;
-    MultiByteToWideChar(  CP_ACP, NULL,title, -1, wText,len );
-    HWND hWnd = FindWindow(NULL, wText);
-    DWORD PID = GetWindowThreadProcessId(hWnd, &PID);
+    BYTE hpbars_toggle[6] = {0x90, 0x90, 0x90, 0x90};
+
+    HWND hWnd = FindWindow(NULL, L"Dawn of War: Soulstorm");
+    DWORD PID;
+    GetWindowThreadProcessId(hWnd, &PID);
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, PID);
-    if(WriteProcessMemory(hProcess, (PVOID)target, fog_toggle, 6, NULL)!=0)
-        return true;
-    return false;
+    bool success = false;
+    if(hProcess)
+    {
+//        if(WriteProcessMemory(hProcess, (PVOID)target, fog_toggle, 6, NULL)!=0)
+//            return true;
+        success = WriteProcessMemory(hProcess, (PVOID)target, fog_toggle, 6, NULL)!=0;
+        if(showHP)
+            WriteProcessMemory(hProcess, (PVOID)hpbars_target, hpbars_toggle, 4, NULL);
+
+        CloseHandle(hProcess);
+    }
+    else
+        qDebug() << "could not open process";
+
+    qDebug() << hWnd << PID << hProcess;
+    DWORD errorMessageID = GetLastError();
+    qDebug() << errorMessageID;
+//    LPSTR messageBuffer = nullptr;
+//    size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+//                                 NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+//    std::string message(messageBuffer, size);
+//    qDebug() << QString::fromStdString(message);
+    //Free the buffer.
+//    LocalFree(messageBuffer);
+
+    return success;
 }
 
 QString StatsCollector::calcMD5(QString fileName)
@@ -367,11 +363,17 @@ bool StatsCollector::init_player()
         QSettings settings_second("HKEY_CURRENT_USER\\Software\\Valve\\Steam", QSettings::NativeFormat);
         steam_path = settings_second.value("SteamPath").toString();
     }
-    QString reg_url = server_addr+"/regplayer.php?&key="+QLatin1String(SERVER_KEY)+"&";
+    QString reg_url = server_addr+"/regplayer.php?";
     int i=0;
+    qDebug() << steam_path;
     if(!userdata_dir.cd(steam_path + "/userdata"))
+    {
+        qDebug() << "could not get userdata directory";
         return false;
+    }
 
+    QVariantMap player_info;
+    QByteArray steam_response;
     foreach (QString name, userdata_dir.entryList())
     {
         if(name!="."&&name!="..")
@@ -380,10 +382,11 @@ bool StatsCollector::init_player()
             if(userdata_dir.entryList().contains("9450"))
             {
                 QString account_id64_str = QString::number(76561197960265728 + name.toInt());
+                qDebug() << "Steam ID associated with Soulstorm:" << account_id64_str;
                 QString url = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+account_id64_str+"&format=json";
                 Request request(url);
-                QByteArray steam_response = sender->getWhileSuccess(request);
-                QVariantMap player_info = QtJson::json_to_map(steam_response);
+                steam_response = sender->getWhileSuccess(request);
+                player_info = QtJson::json_to_map(steam_response);
                 if(player_info.contains("response"))
                 {
                     QVariantMap response = player_info.value("response").toMap();
@@ -391,19 +394,37 @@ bool StatsCollector::init_player()
                     {
                         QVariantList players = response.value("players").toList();
                         if(!players.isEmpty())
+                        {
                             if(players.at(0).toMap().contains("personaname"))
                             {
                                 player_name = players.at(0).toMap().value("personaname").toString();
-                                accounts.insert(player_name, account_id64_str);
-                                qDebug() << "Steam ID associated with Soulstorm:" << account_id64_str << player_name;
-                                QString hex_name(player_name.toUtf8().toHex());
-                                QString num = QString::number(i);
-                                reg_url += "name"+num+"="+hex_name+"&sid"+num+"="+account_id64_str+"&";
-                                ++i;
+                                qDebug() << "Player name associated with Steam ID:" << player_name;
+                                // если игрок на данном аккаунте сейчас играет, и игра Soulstorm, то добавим его в список
+                                // после этого можно так же прерывать цикл, так как нужный игрок найден
+                                if(players.at(0).toMap().value("personastate").toInt()==1)
+                                {
+                                    qDebug() << "Player" << player_name << "is online";
+                                    accounts.insert(player_name, account_id64_str);
+                                    QString hex_name(player_name.toUtf8().toHex());
+                                    QString num = QString::number(i);
+                                    reg_url += "name"+num+"="+hex_name+"&sid"+num+"="+account_id64_str+"&";
+                                    ++i;
+                                }
+                                else
+                                    qDebug() << "Player" << player_name << "is offline";
                             }
+                            else
+                                qDebug() << 5 << steam_response;
+                        }
+                        else
+                            qDebug() << 4 << steam_response;
                     }
+                    else
+                        qDebug() << 3 << steam_response;
 
                 }
+                else
+                    qDebug() << 2 << steam_response;
 
             }
             userdata_dir.cdUp();
@@ -413,11 +434,8 @@ bool StatsCollector::init_player()
     if(accounts.isEmpty()) return false;
 
     qDebug() << reg_url;
+    reg_url += "key="+QLatin1String(SERVER_KEY)+"&";
     emit get(reg_url);
-//    Request request_to_server(reg_url);
-//    QByteArray response_fromstat = sender->getWhileSuccess(request_to_server);
-//    qDebug() << "registration in dowstats: " << QString::fromUtf8(response_fromstat.data());
-
     return true;
 }
 

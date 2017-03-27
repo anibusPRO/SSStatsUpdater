@@ -16,7 +16,7 @@
 #   include "json.h"
 #endif
 
-#define MINIMUM_DURATION 60
+#define MINIMUM_DURATION 30
 
 
 class GameInfoReader
@@ -49,6 +49,8 @@ private:
 
     bool is_playback;
     bool stopgame_valid;
+    // для того чтобы ошибка из профиля выводилась только один раз
+    bool profile_error;
     int last_playback;
     int last_startgame;
     int last_stopgame;

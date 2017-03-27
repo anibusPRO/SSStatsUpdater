@@ -17,16 +17,26 @@ WinConditions::~WinConditions()
 
 bool WinConditions::isStandart(int game_type)
 {
-    if(!hasAnnihilate)
+    if(!hasAnnihilate){
+        qDebug() << "Win conditions do not contain \"Annihilate\"";
         return false;
-    if(hasDestroyHQ)
+    }
+    if(hasDestroyHQ){
+        qDebug() << "Win conditions contain \"Destroy HQ\"";
         return false;
-    if(hasEconomicVictory)
+    }
+    if(hasEconomicVictory){
+        qDebug() << "Win conditions contain \"Economic Victory\"";
         return false;
-    if(hasSuddenDeath)
+    }
+    if(hasSuddenDeath){
+        qDebug() << "Win conditions contain \"Sudden Death\"";
         return false;
-    if(hasAssassinate)
+    }
+    if(hasAssassinate){
+        qDebug() << "Win conditions contain \"Assassinate\"";
         return false;
+    }
     return true;
 }
 

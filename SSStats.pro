@@ -12,11 +12,13 @@ QMAKE_CXXFLAGS += -std=c++11
 CONFIG -= console
 
 TEMPLATE = lib
-#CONFIG += dll
+CONFIG += dll
 
 
 TARGET = SSStats
 
+PROJECT_PATH = "C:/OpenServer/domains/dowstats/ssstats"
+DESTDIR      = $$PROJECT_PATH
 
 #static { # everything below takes effect with CONFIG ''= static
 # CONFIG += static
@@ -35,24 +37,22 @@ TARGET = SSStats
 
 DEFINES += SSSTATS_LIBRARY
 
-SOURCES +=     main.cpp \
-    request.cpp \
-    requestsender.cpp \
-    gameinforeader.cpp \
-    gameinfo.cpp \
-    statscollector.cpp \
-    logger.cpp \
-    replay.cpp \
-    game_action.cpp \
-    player.cpp \
-    winconditions.cpp \
-    gamesettings.cpp \
-    repreader.cpp \
-    extendedbinreader.cpp \
-#    languageservice.cpp \
-    apmmeter.cpp \
-    systemwin32.cpp
-#ssstats.cpp \
+SOURCES += main.cpp \
+        request.cpp \
+        requestsender.cpp \
+        gameinforeader.cpp \
+        gameinfo.cpp \
+        statscollector.cpp \
+        logger.cpp \
+        replay.cpp \
+        game_action.cpp \
+        player.cpp \
+        winconditions.cpp \
+        gamesettings.cpp \
+        repreader.cpp \
+        extendedbinreader.cpp \
+        apmmeter.cpp \
+        systemwin32.cpp
 
 
 HEADERS += request.h \
@@ -60,19 +60,16 @@ HEADERS += request.h \
         gameinforeader.h \
         gameinfo.h \
         statscollector.h \
-    logger.h \
-    replay.h \
-    game_action.h \
-    player.h \
-    winconditions.h \
-    gamesettings.h \
-    repreader.h \
-    extendedbinreader.h \
-#    languageservice.h \
-    apmmeter.h \
-    systemwin32.h
-#ssstats.h\
-#        ssstats_global.h \
+        logger.h \
+        replay.h \
+        game_action.h \
+        player.h \
+        winconditions.h \
+        gamesettings.h \
+        repreader.h \
+        extendedbinreader.h \
+        apmmeter.h \
+        systemwin32.h
 
 
 SOURCES += APMShared/APMConfig.cpp \
@@ -81,24 +78,15 @@ SOURCES += APMShared/APMConfig.cpp \
     APMShared/APMTrigger.cpp \
     APMShared/ProcessResolver.cpp
 
-#HEADERS += APMKeyHook/targetver.h \
 HEADERS +=    APMShared/APMConfig.h \
     APMShared/APMLogger.h \
     APMShared/APMMeasure.h \
     APMShared/APMTrigger.h \
     APMShared/ProcessResolver.h
 
-
-#TARGET = soulstorm_stats
-#TEMPLATE = app
-
-
-#SOURCES +=
-
-#HEADERS += \
 INCLUDEPATH += C:/Qt/qt-static/include
 
-LIBS        +=        -L"c:/Qt/qt-static/lib" -lQtNetwork -lQtCore -lole32 -luuid -lws2_32 -ladvapi32 -lshell32 -luser32 -lkernel32 -lz
+LIBS += -L"c:/Qt/qt-static/lib" -lQtNetwork -lQtCore -lole32 -luuid -lws2_32 -ladvapi32 -lshell32 -luser32 -lkernel32 -lz
 
 
 include(qt_json/qt_json.pri)

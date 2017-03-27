@@ -40,11 +40,11 @@ void GameInfo::set_type(int type)
     _type = type;
 }
 
-void GameInfo::setAPMR(int apm)
+void GameInfo::set_APMR(int apm)
 {
     apmRi = apm;
 }
-void GameInfo::setAPMR(double apm)
+void GameInfo::set_APMR(double apm)
 {
     apmd = apm;
 }

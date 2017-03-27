@@ -33,7 +33,7 @@ private:
     bool init_player();
     bool send_stats(QString path_to_profile);
     bool send_logfile();
-    bool disableFog();
+    bool disableFog(bool showHP);
     int updateUpdater();
     QMap<QString, QString> accounts;
     QString server_addr;

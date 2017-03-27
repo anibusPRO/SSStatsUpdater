@@ -365,15 +365,20 @@ QString RepReader::RenameReplay()
 
     QString rep_filename="",races="",players="";
 
+
     for(int i=0; i<p_count; ++i)
     {
         races += replay->Players.at(i)->getVeryShortRaceName();
         players += "#"+replay->Players.at(i)->Name;
     }
-    rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName()+players;
+    if(p_count<8)
+        rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName()+players;
+    else
+        rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName();
 
-    rep_filename.replace(QRegExp("[^\\w\#\.]"),"");
 
+    rep_filename.replace(QRegExp("[^\\w\.#]"),"_");
+//    rep_filename.replace(QRegExp("[^\\w_~`!@#№$%^&\(\)\[\]\{\}\.,:;-+="),"");
     return rep_filename;
 }
 

@@ -19,109 +19,123 @@ GameSettings::~GameSettings()
 
 bool GameSettings::isStandart(int game_type)
 {
-    if(StartRes     !=0)
+    if(StartRes     !=0){
+        qDebug() << "StartRes:" << getResolvedResources();
         return false;
-    if(game_type!=1&&LockTeams    !=0)
+    }
+    if(game_type!=1&&LockTeams    !=0){
+        qDebug() << "LockTeams:" << getResolvedLockTeams();
         return false;
-    if(CheatsON     !=1)
+    }
+    if(CheatsON     !=1){
+        qDebug() << "CheatsON:" << getResolvedCheats();
         return false;
-    if(game_type!=1&&StartLocation!=0)
+    }
+    if(game_type!=1&&StartLocation!=0){
+        qDebug() << "StartLocation:" << getResolvedPositions();
         return false;
-    if(GameSpeed    !=2)
+    }
+    if(GameSpeed    !=2){
+        qDebug() << "GameSpeed:" << getResolvedGameSpeed();
         return false;
-    if(game_type!=1&&ResShare     !=1)
+    }
+    if(game_type!=1&&ResShare     !=1){
+        qDebug() << "ResShare:" << getResolvedResourceSharing();
         return false;
-    if(ResRate      !=1)
+    }
+    if(ResRate      !=1){
+        qDebug() << "ResRate:" << getResolvedResourceSpeed();
         return false;
+    }
     return true;
 }
 
 
-//QString GameSettings::getResolvedResources() const
-//{
-//    switch (StartRes)
-//    {
-//    case 0: return LS.Std;
-//    case 1: return LS.QuickStart;
-//    default: return LS.Unknown;
-//    }
-//}
+QString GameSettings::getResolvedResources() const
+{
+    switch (StartRes)
+    {
+        case 0: return "Standard";
+        case 1: return "QuickStart";
+        default: return "Unknown";
+    }
+}
 
-//QString GameSettings::getResolvedLockTeams() const
-//{
-//    switch (LockTeams)
-//    {
-//    case 1: return LS.Fixed;
-//    case 0: return LS.UnFixed;
-//    default: return LS.Unknown;
-//    }
-//}
+QString GameSettings::getResolvedLockTeams() const
+{
+    switch (LockTeams)
+    {
+        case 1: return "Fixed";
+        case 0: return "UnFixed";
+        default: return "Unknown";
+    }
+}
 
-//QString GameSettings::getResolvedPositions() const
-//{
-//    switch (StartLocation)
-//    {
-//    case 2: return LS.Random;
-//    case 1: return LS.Fixed;
-//    default: return LS.Unknown;
-//    }
-//}
-
-
-//QString GameSettings::getResolvedCheats() const
-//{
-//    switch (CheatsON)
-//    {
-//    case 0: return LS.No;
-//    case 1: return LS.Yes;
-//    default: return LS.Unknown;
-//    }
-//}
+QString GameSettings::getResolvedPositions() const
+{
+    switch (StartLocation)
+    {
+        case 2: return "Random";
+        case 1: return "Fixed";
+        default: return "Unknown";
+    }
+}
 
 
-//QString GameSettings::getResolvedGameSpeed() const
-//{
-//    switch (GameSpeed)
-//    {
-//    default: return LS.Std;
-//    }
-//}
+QString GameSettings::getResolvedCheats() const
+{
+    switch (CheatsON)
+    {
+        case 0: return "No";
+        case 1: return "Yes";
+        default: return "Unknown";
+    }
+}
 
-//QString GameSettings::getResolvedResourceSharing() const
-//{
-//    switch (ResShare)
-//    {
-//    case 1: return LS.No;
-//    case 2: return LS.Yes;
-//    default: return LS.Unknown;
-//    }
-//}
 
-//QString GameSettings::getResolvedResourceSpeed() const
-//{
-//    switch (ResRate)
-//    {
-//    default: return LS.Std;
-//    }
-//}
+QString GameSettings::getResolvedGameSpeed() const
+{
+    switch (GameSpeed)
+    {
+        default: return "Unknown";
+    }
+}
+
+QString GameSettings::getResolvedResourceSharing() const
+{
+    switch (ResShare)
+    {
+        case 1: return "No";
+        case 2: return "Yes";
+        default: return "Unknown";
+    }
+}
+
+QString GameSettings::getResolvedResourceSpeed() const
+{
+    switch (ResRate)
+    {
+        default: return "Unknown";
+    }
+}
 
 //LanguageService GameSettings::getLS() const
 //{
 //    return LS;
 //}
 
-//QString GameSettings::getResolvedAIDiff() const
-//{
-//    switch (AIDiff)
-//    {
-//    case 0: return LS.Hard;
-//    case 1: return LS.Insane;
-//        case 2: return LS.Easy;
-//        case 3: return LS.Hard;
-//        case 4: return LS.Insane;
-//        default: return LS.Unknown;
-//    }
-//}
+QString GameSettings::getResolvedAIDiff() const
+{
+    switch (AIDiff)
+    {
+        case 0: return "Hard";
+        case 1: return "Insane";
+        case 2: return "Easy";
+        case 3: return "Hard";
+        case 4: return "Insane";
+        default: return "Unknown";
+    }
+}
 
 
 

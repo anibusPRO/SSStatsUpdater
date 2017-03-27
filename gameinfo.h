@@ -30,8 +30,8 @@ public:
     QString get_params(QString site_addr="");
     QString get_sender_name();
     void set_type(int type);
-    void setAPMR(double apm);
-    void setAPMR(int apm);
+    void set_APMR(double apm);
+    void set_APMR(int apm);
     void set_winby(QString str);
     void set_duration(int time);
     void set_team_number(int num);
