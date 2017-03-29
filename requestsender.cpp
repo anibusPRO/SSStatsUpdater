@@ -190,9 +190,9 @@ void RequestSender::slotFinished(QNetworkReply* pnr)
 //        emit done(pnr->url(), pnr->readAll());
 //    qDebug() << pnr->isReadable() << pnr->isFinished();
 
-    QString reply = QString::fromUtf8(pnr->readAll().data());
-    if(reply.isEmpty())
-        qDebug() << "reply is empty";
+//    QString reply = QString::fromUtf8(pnr->readAll().data());
+//    if(reply.isEmpty())
+//        qDebug() << "reply is empty";
 //        qDebug() << reply;
     pnr->deleteLater();
 }

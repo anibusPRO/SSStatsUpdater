@@ -15,9 +15,9 @@
 StatsCollector::StatsCollector(QObject* pobj /*=0*/)
     :QObject(pobj)
 {
-    app = NULL;
-    int argc = 0;
-    app = new QCoreApplication(argc, NULL);
+//    app = NULL;
+//    int argc = 0;
+//    app = new QCoreApplication(argc, NULL);
     QTextCodec::setCodecForTr(QTextCodec::codecForName("utf-8"));
     QTextCodec::setCodecForCStrings(QTextCodec::codecForName("utf-8"));
 
@@ -126,8 +126,6 @@ void StatsCollector::start()
 //    else
 //        delete thread;
 
-    systemWin32 processesInWin;
-
     qDebug() << "start";
     QString cur_profile, params;
 //    int n=0;long avrAPM, TotalActions;
@@ -140,7 +138,8 @@ void StatsCollector::start()
             last_time = TSinfo.lastModified();
         }
         // если время последнего изменения файла больше предыдущего
-        if((last_time>old_time)&&old_time.msecsTo(last_time)>30000){
+//        &&old_time.msecsTo(last_time)>30000
+        if((last_time>old_time)){
             switch (reader->readySend()){
                 // если рузультат вызова 0, то это означает что игра завершилась и она не реплей
                 case 0:
@@ -206,18 +205,20 @@ void StatsCollector::start()
                     qDebug() << "fog disabled";
                     fog = false;
                 }
-
+            systemWin32 processesInWin;
             // проверим есть ли процесс игры в списке запущенных
             // если нет, то завершим работу программы
-//            if(!processesInWin.findProcess("SoulstormN.exe")){
-//                qDebug() << "process not found";
-//                stop = true;
-//            }
+            if(!processesInWin.findProcess("Soulstorm.exe"))
+                if(!processesInWin.findProcess("SoulstormN.exe"))
+                {
+                    qDebug() << "process not found";
+                    stop = true;
+                }
         }
     }
     if(thread->isRunning()){
         apm_meter->stop();
-        thread->wait();
+//        thread->wait();
     }
 }
 
@@ -401,7 +402,8 @@ bool StatsCollector::init_player()
                                 qDebug() << "Player name associated with Steam ID:" << player_name;
                                 // если игрок на данном аккаунте сейчас играет, и игра Soulstorm, то добавим его в список
                                 // после этого можно так же прерывать цикл, так как нужный игрок найден
-                                if(players.at(0).toMap().value("personastate").toInt()==1)
+                                if(players.at(0).toMap().value("personastate").toInt()==1&&
+                                        players.at(0).toMap().value("gameid").toInt()==9450)
                                 {
                                     qDebug() << "Player" << player_name << "is online";
                                     accounts.insert(player_name, account_id64_str);
@@ -494,6 +496,6 @@ StatsCollector::~StatsCollector()
     log.finishLog();
     delete reader;
     delete apm_meter;
-    delete app;
+//    delete app;
 }
 

@@ -1,39 +1,14 @@
-#include <windows.h>
-#include <thread>
-#include <iostream>
-
+#include <QCoreApplication>
 #include "statscollector.h"
 
-static StatsCollector stats_c;
-
-BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, PVOID fImpLoad)
+int main(int argc, char *argv[])
 {
+    QCoreApplication a(argc, argv);
 
-    switch(fdwReason)
-    {
-        // при подключении библиотеки
-        case DLL_PROCESS_ATTACH:
-        {
-            std::thread thr(&StatsCollector::start, &stats_c);
-            thr.detach();
-        }
-            break;
-        // при отключении библиотеки
-        case DLL_PROCESS_DETACH:
-                stats_c.stop = true;
-            break;
-        case DLL_THREAD_ATTACH:
-            break;
-        case DLL_THREAD_DETACH:
-            break;
-        default:
-            break;
-    }
-    return TRUE;
+    StatsCollector stats;
+
+    stats.start();
+
+    return 0;
 }
 
-// эта функция необходима для того чтобы программа загружала данную библиотеку
-// больша функция никак не используется и ни откуда не вызывается
-Q_DECL_EXPORT void my_func(void)
-{
-}

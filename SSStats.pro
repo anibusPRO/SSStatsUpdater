@@ -11,8 +11,9 @@ QMAKE_CXXFLAGS += -std=c++11
 
 CONFIG -= console
 
-TEMPLATE = lib
-CONFIG += dll
+TEMPLATE = app
+#TEMPLATE = lib
+#CONFIG += dll
 
 
 TARGET = SSStats
