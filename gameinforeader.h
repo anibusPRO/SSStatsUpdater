@@ -5,10 +5,12 @@
 #include <QVariantMap>
 #include <QByteArray>
 #include <QString>
-#include "repreader.h"
-#include <QTime>
-#include "gameinfo.h"
 #include <QStringList>
+#include <QTime>
+
+#include "repreader.h"
+#include "gameinfo.h"
+
 
 #ifdef HAVE_QT5
 #   include <QJsonDocument>
@@ -25,27 +27,33 @@ public:
     GameInfoReader();
     ~GameInfoReader();
 
-    QString get_game_info(QString profile);
     QString read_warnings_log(QString str, int offset=0, int count=1);
+    QString get_game_info(QString profile);
     QString get_cur_profile_dir();
-    QString get_steam_id();
-    QString get_playback_name();
+    QString get_steam_id() const;
+    QString get_playback_name() const;
+    QString get_last_invalid_map() const;
+    QStringList get_players(QString profile);
     QByteArray get_playback_file();
+    bool is_map_valid();
     void setTotalActions(long n);
     void set_ss_path(const QString &value);
-    void set_accounts(QMap<QString, QString> map);
+    void set_account(QString SID, QString name);
     int readySend();
+
+
 
 private:
     int search_info(QString profile);
     GameInfo *_game_info;
-    QString sender_steam_id;
     QString cur_profile_name;
     QString ss_path;
     QString playback_name;
+    QString sender_steamID;
+    QString sender_name;
+    QString last_invalid_map;
     QStringList errors_list;
     QByteArray _playback;
-    QMap<QString, QString> accounts;
 
     bool is_playback;
     bool stopgame_valid;
@@ -54,6 +62,7 @@ private:
     int last_playback;
     int last_startgame;
     int last_stopgame;
+    int last_ending_mission;
     int playback_error;
     int average_apm;
     int error_code;

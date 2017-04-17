@@ -15,10 +15,14 @@ class systemWin32
 {
 public:
     systemWin32();
+    ~systemWin32();
+    void updateProcessList();
     bool findProcess(QString findProcName);
+    int findProcessCount(QString findProcName);
     QString getProcessName(int idProcess);
     QStringList getAllProcessList();
 private:
+    HANDLE hSnap;
     QMap <int, QString> win32sysMap;
     QString copyToQString(WCHAR array[MAX_PATH]);
 

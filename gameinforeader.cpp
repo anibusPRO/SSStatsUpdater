@@ -9,24 +9,24 @@
 
 GameInfoReader::GameInfoReader()
 {
-    errors_list <<"Stats processed without errors"<<                                      /* 0*/
-                  "Could not open 'testStats.lua'"<<                                      /* 1*/
-                  "'testStats.lua' is not readable"<<                                     /* 2*/
-                  "Stats file does not contain 'GSGameStats'"<<                           /* 3*/
-                  "GSGameStats does not contain 'WinBy'"<<                                /* 4*/
-                  "GSGameStats does not contain 'Duration'"<<                             /* 5*/
-                  "GSGameStats does not contain Players"<<                                /* 6*/
-                  "GSGameStats does not contain Scenario"<<                               /* 7*/
-                  "GSGameStats does not contain 'Teams'"<<                                /* 8*/
-                  "Unsupported type of game. The number of teams is not equals two."<<    /* 9*/
-                  "Player left the game"<<                                   /*10*/
-                  "GSGameStats does not contain player id"<<                              /*11*/
-                  "Player does not contain 'PHuman'"<<                                    /*12*/
-                  "Player is not human"<<                                                 /*13*/
-                  "Player does not contain players info"<<                                /*14*/
-                  "Unsupported type of game. Number of players per team is not equal."<<  /*15*/
-                  "Could not open 'temp.rec'"<<                                           /*16*/
-                  "Game options is not standart";                                         /*17*/
+    errors_list <<"SUCCESS! Stats processed without errors"<<                                      /* 0*/
+                  "ERROR! Could not open 'testStats.lua'"<<                                      /* 1*/
+                  "ERROR! 'testStats.lua' is not readable"<<                                     /* 2*/
+                  "ERROR! Stats file does not contain 'GSGameStats'"<<                           /* 3*/
+                  "ERROR! GSGameStats does not contain 'WinBy'"<<                                /* 4*/
+                  "ERROR! GSGameStats does not contain 'Duration'"<<                             /* 5*/
+                  "ERROR! GSGameStats does not contain Players"<<                                /* 6*/
+                  "ERROR! GSGameStats does not contain Scenario"<<                               /* 7*/
+                  "ERROR! GSGameStats does not contain 'Teams'"<<                                /* 8*/
+                  "ERROR! Unsupported type of game. The number of teams is not equals two."<<    /* 9*/
+                  "ERROR! Player left the game"<<                                   /*10*/
+                  "ERROR! GSGameStats does not contain player id"<<                              /*11*/
+                  "ERROR! Player does not contain 'PHuman'"<<                                    /*12*/
+                  "ERROR! Player is not human"<<                                                 /*13*/
+                  "ERROR! Player does not contain players info"<<                                /*14*/
+                  "ERROR! Unsupported type of game. Number of players per team is not equal."<<  /*15*/
+                  "ERROR! Could not open 'temp.rec'"<<                                           /*16*/
+                  "ERROR! Game options is not standart";                                         /*17*/
 //                  "'userdata' is not exists or is not readable"<<                         /* 9*/
 //                  "'userdata' folder is empty"<<                                          /*10*/
 //                  "'account_id32_str' is Null"<<                                          /*11*/
@@ -39,6 +39,7 @@ GameInfoReader::GameInfoReader()
     last_playback  = 0;
     last_startgame = 0;
     last_stopgame  = 0;
+    last_ending_mission = 0;
     playback_error = 0;
     _game_info = 0;
     is_playback = false;
@@ -55,22 +56,24 @@ void GameInfoReader::set_ss_path(const QString &value)
     ss_path = value;
 }
 
-void GameInfoReader::set_accounts(QMap<QString, QString> map)
+void GameInfoReader::set_account(QString SID, QString name)
 {
-    accounts = map;
+    sender_steamID = SID;
+    sender_name = name;
 }
 
-QString GameInfoReader::get_steam_id()
+QString GameInfoReader::get_steam_id() const
 {
-    return sender_steam_id;
+    return sender_steamID;
 }
 
 int GameInfoReader::readySend()
 {
+//    read_warnings_log("GAME -- Ending mission", -1);
     read_warnings_log("APP -- Game Stop", -1);
 
-//    qDebug() << last_playback << last_startgame << last_stopgame << playback_error;
-    if(last_playback>last_stopgame)
+//    qDebug() << last_playback << last_startgame << last_stopgame << playback_error << last_ending_mission;
+    if(last_playback>last_stopgame&&last_playback>last_ending_mission)
     {
         is_playback = true;
         return 2;
@@ -78,9 +81,9 @@ int GameInfoReader::readySend()
     if(is_playback)
     {
         is_playback = false;
-//        return 3;
+        return 3;
     }
-    if(last_startgame>last_stopgame)
+    if(last_startgame>last_stopgame&&last_startgame>last_ending_mission)
         return 1;
     return 0;
 }
@@ -89,13 +92,10 @@ QString GameInfoReader::get_cur_profile_dir()
 {
     QDir temp_dir(ss_path+"/Profiles");
     QString name;
-    name = read_warnings_log("Using player profile", 3, 5);
-    int n=0;
-    while(n<5&&name=="")
+    for(int i=0; i<3&&name.isEmpty();++i)
     {
         name = read_warnings_log("Using player profile", 3, 5);
-        Sleep(5000);
-        n++;
+        Sleep(3000);
     }
     QString profile = "Profile1";
     // если имя профиля не изменилось, то отправим пустую строку, как знак того что профиль не сменился
@@ -129,7 +129,7 @@ QString GameInfoReader::get_cur_profile_dir()
                         }
                         else
                         {
-                            if(profile_error)
+                            if(!profile_error)
                             {
                                 qDebug() << temp_dir.path();
                                 qDebug() << "Could not open name.dat";
@@ -144,7 +144,7 @@ QString GameInfoReader::get_cur_profile_dir()
                             cur_profile_name = str;
                             break;
                         }
-                        else if(profile_error)
+                        else if(!profile_error)
                         {
                             qDebug() << name << str;
                             profile_error = false;
@@ -162,11 +162,31 @@ QString GameInfoReader::get_cur_profile_dir()
 
 }
 
+bool GameInfoReader::is_map_valid()
+{
+    QString map_name;
+    QString error_str = read_warnings_log("Lobby -- Setting up game with scenario", 7, 5);
+    if(error_str.contains("(invalid)"))
+    {
+        map_name = error_str.remove(" (invalid)");
+        if(last_invalid_map==map_name)
+            return true;
+        last_invalid_map = map_name;
+        if(QFile::exists(ss_path + "/DXP2/Data/Scenarios/mp/" + map_name+".sgb"))
+            qDebug() << "map" << map_name << "is invalid";
+        else
+            qDebug() << "map does not exist" << map_name;
+        return false;
+    }
+
+    return true;
+}
+
 QByteArray GameInfoReader::get_playback_file()
 {
     return _playback;
 }
-QString GameInfoReader::get_playback_name()
+QString GameInfoReader::get_playback_name() const
 {
     return playback_name;
 }
@@ -191,8 +211,6 @@ QString GameInfoReader::get_game_info(QString profile)
 
 int GameInfoReader::search_info(QString profile)
 {
-    if(accounts.isEmpty()) return error_code;
-
     QFile file(profile + "/testStats.lua");
 
     if(!file.open(QIODevice::ReadOnly))
@@ -223,7 +241,7 @@ int GameInfoReader::search_info(QString profile)
     QString winby = GSGameStats.value("WinBy").toString();    // условие победы
     int players_count = GSGameStats.value("Players").toInt(); // количество игроков
     int duration = GSGameStats.value("Duration").toInt();     // продолжительность игры
-    int team_num = GSGameStats.value("Teams").toInt();
+    int team_num = GSGameStats.value("Teams").toInt();        // количество команд
 
     if(team_num!=2) return 9;
     if(duration<MINIMUM_DURATION) return 10;
@@ -254,13 +272,11 @@ int GameInfoReader::search_info(QString profile)
         teams[player.value("PTeam").toInt()]++;
 
         p_name = player.value("PName").toString();
-        if(accounts.keys().contains(p_name))
+        if(sender_name==p_name)
         {
-            sender_steam_id = accounts.value(p_name);
             _game_info->set_sender_name(p_name);
             fnl_state = player.value("PFnlState").toInt();
             sender_id = i;
-//            sender_is_player = true;
         }
         else
             fnl_state = player.value("PFnlState").toInt();
@@ -270,10 +286,6 @@ int GameInfoReader::search_info(QString profile)
                                    player.value("PTeam").toInt(), fnl_state/*, rep_reader.GetAverageAPM(i)*/);
     }
 
-//    if(!sender_is_player) return 23;
-    // если количество игроков в первой команде равно количеству игроков во второй команде,
-    // то тип игры равен количеству игроков в одной из команд
-//    qDebug() << teams[0] << teams[1];
     if(teams[0]!=teams[1]) return 15;
     int game_type = teams[0];
     if(sender_id!=-1&&winby.isEmpty())
@@ -337,9 +349,7 @@ int GameInfoReader::search_info(QString profile)
 
     QString mod_name = read_warnings_log("MOD -- Initializing Mod", 4);  // имя запущенного мода
 
-    if(sender_steam_id.isEmpty())
-        sender_steam_id = accounts.values().first();
-    _game_info->set_steam_id(sender_steam_id);
+    _game_info->set_steam_id(sender_steamID);
     _game_info->set_APMR(AverageAPM);
     _game_info->set_type(game_type);
     _game_info->set_team_number(team_num);
@@ -348,6 +358,71 @@ int GameInfoReader::search_info(QString profile)
     _game_info->set_mod_name(mod_name);
 
     return 0;
+}
+
+QStringList GameInfoReader::get_players(QString profile)
+{
+    QFile file(profile + "/testStats.lua");
+    if(!file.open(QIODevice::ReadOnly))
+        return QStringList();
+    if(!file.isReadable())
+        return QStringList();
+    int k=0;
+    while(file.read(1)!="G")
+        k++;
+    file.seek(k);
+    QByteArray testStats = file.readAll();
+    QVariantMap stats = QtJson::to_map(testStats);
+    file.close();
+    int parse_res = 0;
+    if(!stats.contains("GSGameStats")) parse_res = 3;
+    QVariantMap GSGameStats = stats.value("GSGameStats").toMap();
+    if(!GSGameStats.contains("Players")) parse_res = 6;
+    if(parse_res!=0){
+        qDebug() << errors_list.at(parse_res);
+        qDebug() << testStats;
+        return QStringList();
+    }
+    int players_count = GSGameStats.value("Players").toInt(); // количество игроков
+
+    QStringList result;
+//    result.reserve(8);
+    QList<QVariantMap> players;
+    int sender_team, sender_id=-1;
+    for(int i=0; i<players_count;++i)
+    {
+        QString player_id = "player_"+QString::number(i);
+        if(!GSGameStats.contains(player_id)) continue;
+        QVariantMap player = GSGameStats.value(player_id).toMap();
+        if(!(player.contains("PName")&&player.contains("PRace")&&player.contains("PTeam")))
+            continue;
+        if(sender_name==player.value("PName").toString())
+        {
+            sender_team = player.value("PTeam").toInt();
+            sender_id = i;
+        }
+        players << player;
+    }
+    if(sender_id!=-1)
+        for(int i=0; i<players.size();++i)
+        {
+            if(players.at(i).value("PTeam")!=sender_team)
+                result << QString(players.at(i).value("PName").toString()+" - "+
+                                   players.at(i).value("PRace").toString());
+            else
+                result << QStringList();
+//            QString(players.at(i).value("PName").toString()+" - "+
+
+        }
+    else
+        return QStringList();
+    return result;
+}
+
+
+QString GameInfoReader::get_last_invalid_map() const
+{
+    return last_invalid_map;
 }
 
 QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int count/*=1*/)
@@ -367,7 +442,8 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
     game_flags << "APP -- Game Stop"
                << "APP -- Game Start"
                << "APP -- Game Playback"
-               << "REC -- Error opening file playback:temp.rec for write";
+               << "REC -- Error opening file playback:temp.rec for write"
+               << "GAME -- Ending mission";
 
 
     bool fstate = false;
@@ -424,6 +500,8 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
                 last_playback = counter;
             if(line.contains(game_flags.at(3)))
                 playback_error = counter;
+            if(line.contains(game_flags.at(4)))
+                last_ending_mission = counter;
         }
 
         // если искомое слово найдено, то можно завершать цикл

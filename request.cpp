@@ -21,7 +21,7 @@ QString Request::address() const
 
 void Request::setAddress(QString address)
 {
-    QUrl u(address);
+    QUrl u(address, QUrl::StrictMode);
     for (QPair<QString, QString> value : u.queryItems())
         addParam(value.first, value.second);
 //        for (QPair<QString, QString> value : QUrlQuery(QUrl(address)).queryItems())
@@ -72,7 +72,7 @@ QMap<QString, QString> Request::params() const
 
 QUrl Request::url(bool forGetRequest /*= true*/) const
 {
-    QUrl url(address());
+    QUrl url(address(), QUrl::StrictMode);
     if (forGetRequest)
         url.setEncodedQuery(data(forGetRequest));
 //            url.setQuery(data());

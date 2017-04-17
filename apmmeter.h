@@ -37,6 +37,7 @@ public:
 
 private:
     long max;
+    bool calc_max;
 
 public slots:
     void start();

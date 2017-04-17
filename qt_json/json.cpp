@@ -93,9 +93,10 @@ namespace QtJson {
 
             // Return the parsed value
             return value;
-        } else
+        } else{
             // Return the empty QVariant
             return QVariant();
+        }
     }
 
     QByteArray serialize(const QVariant &data) {
@@ -226,7 +227,7 @@ namespace QtJson {
         // Determine what kind of data we should parse by
         // определим тип данных которые следует пропарсить
         // checking out the upcoming token
-//        //qDebug() << "lookAheadToken" << lookAhead(json, index);
+
         switch(lookAhead(json, index)) {
             case JsonTokenString:
                 return parseString(json, index, success);
@@ -251,6 +252,7 @@ namespace QtJson {
 
         // If there were no tokens, flag the failure and return an empty QVariant
         success = false;
+
         return QVariant();
     }
 
@@ -263,7 +265,7 @@ namespace QtJson {
         // Get rid of the whitespace and increment index
         nextToken(json, index);
         if(index==1&&fileType=="lua") index = 0;
-        //qDebug() << "parseObject";
+
         // Loop through all of the key/value pairs of the object
         bool done = false;
         while (!done) {
@@ -274,18 +276,14 @@ namespace QtJson {
                 success = false;
                 return QVariantMap();
             } else if (token == JsonTokenComma) {
-                //qDebug() << "Comma";
                 nextToken(json, index);
             } else if (token == JsonTokenCurlyClose) {
                 nextToken(json, index);
                 if(index==json.size()-2&&fileType=="lua") index = json.size()-3;
-//                qDebug() << "return map" << index << json.size();
                 return map;
             } else {
-                //qDebug() << "parseString";
                 // Parse the key/value pair's name
                 QString name = parseString(json, index, success).toString();
-//                qDebug() << name << success;
 
                 if (!success) {
                     return QVariantMap();
@@ -294,27 +292,21 @@ namespace QtJson {
                 // Get the next token
                 token = nextToken(json, index);
 
-                //qDebug() << "nextToken" << token;
-
                 // If the next token is not a colon, flag the failure
                 // return an empty QVariant
                 if (token != JsonTokenColon) {
                     success = false;
                     return QVariant(QVariantMap());
                 }
-                //qDebug() << "parseValue";
                 // Parse the key/value pair's value
                 QVariant value = parseValue(json, index, success);
-                //qDebug() << "Value" << value.toString();
                 if (!success) {
                     return QVariantMap();
                 }
-//                qDebug() << name;
                 // Assign the value to the key in the map
                 map[name] = value;
             }
         }
-
         // Return the map successfully
         return QVariant(map);
     }
@@ -357,7 +349,6 @@ namespace QtJson {
     static QVariant parseString(const QString &json, int &index, bool &success) {
         QString s;
         QChar c;
-        //qDebug() << "debug";
         eatWhitespace(json, index);
 
 
@@ -365,13 +356,15 @@ namespace QtJson {
         if(c!='"'&&fileType=="lua") s.append(c);
 
         bool complete = false;
+        bool quoteOpen = false;
+        if(c=='"')
+            quoteOpen = true;
         while(!complete) {
             if (index == json.size()) {
                 break;
             }
 
             c = json[index++];
-//            qDebug() << c;
             if (c == '\"'|| (fileType=="lua"&&c == ',')) {
                 complete = true;
                 break;
@@ -413,22 +406,19 @@ namespace QtJson {
                     }
                 }
             } else
-                if(json[index] == '=' && fileType=="lua"){
+                if(json[index] == '=' && fileType=="lua" && !quoteOpen){
                     complete = true;
                     break;
                 }
                 else
                 {
                     s.append(c);
-//                    //qDebug() << "string" << s;
                 }
         }
-//        //qDebug() << s;
         if (!complete) {
             success = false;
             return QVariant();
         }
-
         return QVariant(s);
     }
 
@@ -436,7 +426,6 @@ namespace QtJson {
      * parseNumber
      */
     static QVariant parseNumber(const QString &json, int &index) {
-        //qDebug() << "parseNumber";
         eatWhitespace(json, index);
 
         int lastIndex = lastIndexOfNumber(json, index);
@@ -464,7 +453,6 @@ namespace QtJson {
                 qulonglong ull = numberStr.toULongLong(&ok);
                 return ok ? ull : QVariant(numberStr);
             }
-            //qDebug() << u;
             return u;
         }
     }
@@ -474,13 +462,11 @@ namespace QtJson {
      */
     static int lastIndexOfNumber(const QString &json, int index) {
         int lastIndex;
-//        //qDebug() << "first index of number" << index;
         for(lastIndex = index; lastIndex < json.size(); lastIndex++) {
             if (QString("0123456789+-.eE").indexOf(json[lastIndex]) == -1) {
                 break;
             }
         }
-//        //qDebug() << "last index of number" << lastIndex;
         return lastIndex -1;
     }
 
@@ -514,7 +500,6 @@ namespace QtJson {
         }
 
         QChar c = json[index];
-//        qDebug() << "char" << c ;
         index++;
         if(fileType=="lua")
             switch(c.toLatin1()) {
@@ -523,20 +508,6 @@ namespace QtJson {
     //            case '[': return JsonTokenSquaredOpen;
     //            case ']': return JsonTokenSquaredClose;
                 case ',': return JsonTokenComma;
-                case 'A': case 'B': case 'C': case 'D': case 'E':
-                case 'F': case 'G': case 'H': case 'I': case 'J':
-                case 'K': case 'L': case 'M': case 'N': case 'O':
-                case 'P': case 'Q': case 'R': case 'S': case 'T':
-                case 'U': case 'V': case 'W': case 'X': case 'Y':
-                case 'Z':
-                case 'a': case 'b': case 'c': case 'd': case 'e':
-                case 'f': case 'g': case 'h': case 'i': case 'j':
-                case 'k': case 'l': case 'm': case 'n': case 'o':
-                case 'p': case 'q': case 'r': case 's': case 't':
-                case 'u': case 'v': case 'w': case 'x': case 'y':
-                case 'z': case '[': case ']': case '-': case '\\':
-                case '(': case ')': case '\'': case '!': case '˚':
-                case '/': case '▽': case '"':
                 return JsonTokenString;
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':

@@ -13,8 +13,8 @@ CONFIG -= console
 
 TEMPLATE = app
 #TEMPLATE = lib
-#CONFIG += dll
-
+#CONFIG += static
+#DEFINES += BOOST_NO_EXCEPTIONS
 
 TARGET = SSStats
 
@@ -35,6 +35,7 @@ DESTDIR      = $$PROJECT_PATH
 # win32: TARGET = $$join(TARGET,,,d)
 #}
 
+INCLUDEPATH += C:/boost/include/boost-1_63
 
 DEFINES += SSSTATS_LIBRARY
 
@@ -53,7 +54,10 @@ SOURCES += main.cpp \
         repreader.cpp \
         extendedbinreader.cpp \
         apmmeter.cpp \
-        systemwin32.cpp
+        systemwin32.cpp \
+    OSDaB-Zip/unzip.cpp \
+    OSDaB-Zip/zip.cpp \
+    OSDaB-Zip/zipglobal.cpp
 
 
 HEADERS += request.h \
@@ -70,7 +74,14 @@ HEADERS += request.h \
         repreader.h \
         extendedbinreader.h \
         apmmeter.h \
-        systemwin32.h
+        systemwin32.h \
+    vdf_parser.hpp \
+    OSDaB-Zip/unzip.h \
+    OSDaB-Zip/unzip_p.h \
+    OSDaB-Zip/zip.h \
+    OSDaB-Zip/zip_p.h \
+    OSDaB-Zip/zipentry_p.h \
+    OSDaB-Zip/zipglobal.h
 
 
 SOURCES += APMShared/APMConfig.cpp \
@@ -84,11 +95,6 @@ HEADERS +=    APMShared/APMConfig.h \
     APMShared/APMMeasure.h \
     APMShared/APMTrigger.h \
     APMShared/ProcessResolver.h
-
-INCLUDEPATH += C:/Qt/qt-static/include
-
-LIBS += -L"c:/Qt/qt-static/lib" -lQtNetwork -lQtCore -lole32 -luuid -lws2_32 -ladvapi32 -lshell32 -luser32 -lkernel32 -lz
-
 
 include(qt_json/qt_json.pri)
 #!contains(DEFINES, HAVE_QT5)

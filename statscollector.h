@@ -12,6 +12,17 @@
 
 #define STEAM_API_KEY "B09655A1E41B5DE93AD3F27087D25884"
 
+typedef struct{
+    int AverageAPM;
+    int CurrentAPM;
+    int MaxAPM;
+    int downloadProgress;
+    char players[8][100];
+    char mapName[50];
+} TGameInfo;
+
+typedef TGameInfo *PGameInfo;
+
 class StatsCollector : public QObject
 {
     Q_OBJECT
@@ -27,6 +38,8 @@ public:
     bool stop=false;
 
 private:
+
+    void download_map(QString map_name);
     QString get_soulstorm_installlocation();
     QString calcMD5(QString fileName);
     QString calcMD5(QByteArray data);
@@ -34,26 +47,33 @@ private:
     bool send_stats(QString path_to_profile);
     bool send_logfile();
     bool disableFog(bool showHP);
+    bool decompress(const QString& file, const QString& out, const QString& pwd);
     int updateUpdater();
-    QMap<QString, QString> accounts;
+    QString sender_steamID;
+    QString sender_name;
     QString server_addr;
     QString version;
+    QString ss_path;
     QCoreApplication *app;
     RequestSender* sender;
     GameInfoReader* reader;
     APMMeter *apm_meter;
     Logger log;
+    HANDLE hSharedMemory;
+    PGameInfo lpSharedMemory;
+    QThread *sender_thread;
 
 signals:
     void start_meter();
-    void sendfile(QString url,
-                  QString name,
-                  QString content,
-                  QByteArray data);
+    void post(QString url,
+              QString name,
+              QString content,
+              QByteArray data);
     void get(QString url);
 
 private slots:
 //    void slotError ( );
+    void updateProgress(qint64 bytesSent, qint64 bytesTotal);
     void slotDone (const QUrl&url, const QByteArray&btr);
 };
 

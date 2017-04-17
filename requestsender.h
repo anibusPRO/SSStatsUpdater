@@ -10,6 +10,7 @@
 
 class QNetworkAccessManager;
 class QNetworkReply;
+class QSslError;
 
 class RequestSender:public QObject
 {
@@ -27,14 +28,13 @@ public:
     ~RequestSender();
 
     void setProxy(const QNetworkProxy& proxy);
-
+//    QByteArray *getFile();
     QByteArray get(Request& request);
     QByteArray post(Request& request);
     QByteArray getWhileSuccess(Request& request, int maxCount = 2);
     QByteArray postWhileSuccess(Request& request, int maxCount = 2);
 
     void setMaxWaitTime(qint64 max);
-
     qint64 maxWaitTime() const;
     RequestError error() const;
 
@@ -45,19 +45,23 @@ private:
     RequestError _error;
     QNetworkProxy _proxy;
     QNetworkAccessManager* m_pnam;
+    QByteArray *file;
 
 public slots:
-//    void progress(qint64 bytesSent, qint64 bytesTotal);
-    void download(QString url);
-    void upload(QString url,
-                QString name,
-                QString content,
-                QByteArray data);
+    void updateProgress(qint64 bytesSent, qint64 bytesTotal);
+//    void sslErrors(QNetworkReply* reply,const QList<QSslError> &errors);
+    void get(QString url);
+    void post(QString url,
+              QString name,
+              QString content,
+              QByteArray data);
 private slots:
     void slotFinished(QNetworkReply*);
 
 signals:
     void done(const QUrl&, const QByteArray&);
+    void downloadProgress(qint64,qint64);
+    void finished();
 //    void error();
 
 };

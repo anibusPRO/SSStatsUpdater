@@ -40,12 +40,3 @@ bool WinConditions::isStandart(int game_type)
     return true;
 }
 
-void WinConditions::debug()
-{
-    qDebug() << "hasDestroyHQ:      " << hasDestroyHQ      ;
-    qDebug() << "hasEconomicVictory:" << hasEconomicVictory;
-    qDebug() << "hasSuddenDeath:    " << hasSuddenDeath    ;
-    qDebug() << "hasAnnihilate:     " << hasAnnihilate     ;
-    qDebug() << "hasAssassinate:    " << hasAssassinate    ;
-}
-

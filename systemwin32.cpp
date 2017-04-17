@@ -2,11 +2,44 @@
 
 systemWin32::systemWin32()
 {
-    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (hSnap == NULL)
     {
 //        QMessageBox::critical(0, "Error!", "Error Load ToolHelp", QMessageBox::Close);
+        qDebug() << "Error Load ToolHelp";
+        return;
+    }
+
+    PROCESSENTRY32 proc = { sizeof(proc) };
+
+    if (Process32First(hSnap, &proc))
+    {
+        QString filename;
+
+        filename = copyToQString(proc.szExeFile);
+        win32sysMap[proc.th32ProcessID] = filename;
+
+        while (Process32Next(hSnap, &proc))
+        {
+            filename = copyToQString(proc.szExeFile);
+            win32sysMap[proc.th32ProcessID] = filename;
+        }
+    }
+}
+
+systemWin32::~systemWin32()
+{
+    CloseHandle(hSnap);
+}
+
+void systemWin32::updateProcessList()
+{
+    hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    win32sysMap.clear();
+
+    if (hSnap == NULL)
+    {
         qDebug() << "Error Load ToolHelp";
         return;
     }
@@ -35,10 +68,29 @@ bool systemWin32::findProcess(QString findProcName)
     while (i.hasNext())
     {
         i.next();
-        if (i.value() == findProcName) return true;
+        if (i.value().contains(findProcName, Qt::CaseInsensitive))
+        {
+//            qDebug() << i.value();
+            return true;
+        }
     }
 
     return false;
+}
+
+// считает количество процессов с данным именем и возвращает результат
+int systemWin32::findProcessCount(QString findProcName)
+{
+    int counter = 0;
+    QMapIterator<int, QString> i(win32sysMap);
+    while (i.hasNext())
+    {
+        i.next();
+        if (i.value() == findProcName)
+            counter++;
+    }
+
+    return counter;
 }
 
 // получить имя процесса по ID-у

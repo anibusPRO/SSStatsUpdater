@@ -36,10 +36,10 @@ void RepReader::setReplay(Replay *value)
 
 bool RepReader::ReadReplayFully(QDataStream *stream, QString fileName)
 {
-    qDebug() << "Read Header";
+//    qDebug() << "Read Header";
     if (this->ReadHeader(stream, fileName))
     {
-        qDebug() << "Read Players";
+//        qDebug() << "Read Players";
         for (int players = 0; players < this->replay->Slots; players++)
         {
             this->ReadPlayer();
@@ -168,7 +168,7 @@ bool RepReader::ReadHeader(QDataStream *stream, QString fullFileName)
         qDebug() << this->replay->Map;
         BinReader->ReadChars(16);
         auto DATABASE = BinReader->ReadChars(8);
-        qDebug() <<DATABASE;
+//        qDebug() <<DATABASE;
         // "Версия chunk"
         BinReader->ReadInt32();
 
@@ -333,7 +333,11 @@ QString RepReader::RenameReplay()
     else
     {
         for(int i=0; i<p_count; ++i)
-            ingame_rep_name += replay->Players.at(i)->getVeryShortRaceName() + "/";
+        {
+            ingame_rep_name += replay->Players.at(i)->getVeryShortRaceName();
+            if(i!=p_count-1) ingame_rep_name += "v";
+            else ingame_rep_name += "|";
+        }
         ingame_rep_name += replay->getShortMapName();
     }
 
@@ -377,7 +381,9 @@ QString RepReader::RenameReplay()
         rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName();
 
 
-    rep_filename.replace(QRegExp("[^\\w\.#]"),"_");
+    rep_filename.replace(QRegExp("[^\\w\.#]"),"");
+    if(rep_filename.size()>50)
+        rep_filename.remove(50, rep_filename.size()-50);
 //    rep_filename.replace(QRegExp("[^\\w_~`!@#№$%^&\(\)\[\]\{\}\.,:;-+="),"");
     return rep_filename;
 }
@@ -470,16 +476,9 @@ bool RepReader::OpenFile(QDataStream *stream)
 bool RepReader::isStandart(int game_type)
 {
     if(!replay->conditions->isStandart(game_type))
-    {
-        qDebug() << "Conditions is not standart";
-        replay->conditions->debug();
         return false;
-    }
-    if(!replay->settings->isStandart(game_type)  )
-    {
-        qDebug() << "Settings is not standart";
+    if(!replay->settings->isStandart(game_type))
         return false;
-    }
     return true;
 }
 

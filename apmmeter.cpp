@@ -55,6 +55,7 @@ void APMMeter::mainCycle()
     timerId = SetTimer(NULL, 0, MEASURE_CYCLE_LENGTH-10, NULL);
     qDebug() << "meter started";
     max = 0;
+    calc_max = false;
     MSG msg = {0};
     while(!stop_flag)
     {
@@ -65,11 +66,13 @@ void APMMeter::mainCycle()
 
         // если это сообщение таймера
         if(msg.message == WM_TIMER) {
-            // получаем текущий APM (текущий APM это APM вычисляемый из 20 последних действий)
-            long current = measure->getCurrentAPM();
-            // если текущий APM больше максимального, то обновляем максимальный
-            if(current > max)
-                max = current;
+            if(calc_max){
+                // получаем текущий APM (текущий APM это APM вычисляемый из 20 последних действий)
+                long current = measure->getCurrentAPM();
+                // если текущий APM больше максимального, то обновляем максимальный
+                if(current > max)
+                    max = current;
+            }
             // выводим текущий APM, средний и максимальный
             measure->moveCurrentAPM();
 
@@ -97,8 +100,8 @@ void APMMeter::start()
 void APMMeter::stop()
 {
     stop_flag = true;
-//    measure->resetAllAPM();
 }
+
 long APMMeter::getTotalActions()
 {
     return measure->getTotalActions();
@@ -121,5 +124,8 @@ long APMMeter::getCurrentAPM()
 
 long APMMeter::getMaxAPM()
 {
+    if(!calc_max)
+        return measure->getCurrentAPM();
+    calc_max = true;
     return max;
 }

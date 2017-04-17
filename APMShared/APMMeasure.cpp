@@ -16,8 +16,6 @@ APMMeasure::APMMeasure(APMConfig* n_cfg) {
 //      LPCTSTR lpName);         // имя отображенного файла
 
 	hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, SHARED_MEMORY_SIZE, SHARED_MEMORY_NAME);
-    // переменная для хранения общего количества действий
-    // не понятно для чего нужная эта переменная
     lpSharedMemory = (LPLONG)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, SHARED_MEMORY_SIZE);
 
 	resetAllAPM();
