@@ -268,15 +268,6 @@ bool RepReader::ReadHeader(QDataStream *stream, QString fullFileName)
         this->replay->conditions->hasTakeAndHold = win_conditions.contains((int)WinConditions::TakeAndHold);
         this->replay->conditions->hasGameTimer = win_conditions.contains((int)WinConditions::GameTimer);
 
-//        if(this->replay->conditions->hasAnnihilate     ) qDebug() << "Annihilate";
-//        if(this->replay->conditions->hasSuddenDeath    ) qDebug() << "SuddenDeath";
-//        if(this->replay->conditions->hasAssassinate    ) qDebug() << "Assassinate";
-//        if(this->replay->conditions->hasEconomicVictory) qDebug() << "EconomicVictory";
-//        if(this->replay->conditions->hasControlArea    ) qDebug() << "ControlArea";
-//        if(this->replay->conditions->hasDestroyHQ      ) qDebug() << "DestroyHQ";
-//        if(this->replay->conditions->hasTakeAndHold    ) qDebug() << "TakeAndHold";
-//        if(this->replay->conditions->hasGameTimer      ) qDebug() << "GameTimer";
-
         BinReader->ReadChars(5);
 
         this->replay->PlayerStart = BinReader->device()->pos();
@@ -382,6 +373,11 @@ QString RepReader::RenameReplay()
 
 
     rep_filename.replace(QRegExp("[^\\w\.#]"),"");
+    // чтобы игра смогла запустить реплей, размер его имени не должен превышать 54 символов
+    // 4 символа это расширение файла, 5 символов это разделитель + id игры, однако id постоянно растет
+    // и не всегда будет занимать 4 символа
+    // найдено решение, которое позволяет удалять id игры перед скачиванием файла
+    // поэтому можно увеличить размер имени файла до 50 символов
     if(rep_filename.size()>50)
         rep_filename.remove(50, rep_filename.size()-50);
 //    rep_filename.replace(QRegExp("[^\\w_~`!@#№$%^&\(\)\[\]\{\}\.,:;-+="),"");
@@ -818,4 +814,101 @@ void RepReader::ReadActionDetail()
         else
             BinReader->ReadBytesArray(action1Len);
     }
+}
+
+bool RepReader::convertReplayToSteamVersion(Replay *rep)
+{
+    QFile file(rep->FullFileName);
+
+    if(file.open(QIODevice::ReadWrite))
+    {
+        QDataStream in(&file);
+        OpenFile(&in);
+        QByteArray ar;
+        ar.resize(12);
+        // запишем символы строки разделяя нулями
+        for(int i=0; i<12; ++i)
+            ar[i] = 0x00;
+        // запишем новую версию реплея
+        BinReader->WriteInt32(10);
+        BinReader->device()->seek(rep->BeginFOLDINFO);
+        BinReader->WriteInt32(rep->LengthFOLDINFO+12*rep->BeginFOLDGPLYz.size());
+        for(int i=0; i<rep->BeginFOLDGPLYz.size(); ++i)
+        {
+            // переходим в позицию начала длины FOLDGPLY + смещение соответствующее номеру слота
+            BinReader->device()->seek(rep->BeginFOLDGPLYz.at(i)+i*12);
+            // получаем длину FOLDGPLY
+            int LengthFOLDGPLY = BinReader->ReadInt32();
+            // возвращаемся в позцию начала длины
+            BinReader->device()->seek(rep->BeginFOLDGPLYz.at(i)+i*12);
+            // пишем новую длину
+            BinReader->WriteInt32(LengthFOLDGPLY + 12);
+            // пропускаем байты до длины DATAINFO
+            BinReader->ReadChars(16);
+            // читаем длину DATAINFO
+            int LengthDATAINFO = BinReader->ReadInt32();
+            // возвращаемся
+            BinReader->device()->seek(BinReader->device()->pos()-4);
+            // пишем новую длину
+            BinReader->WriteInt32(LengthDATAINFO + 12);
+            // позиция после длины DATAINFO
+            int BeginDATAINFO = BinReader->device()->pos();
+            // перед записью делаем копию данных после записываемого
+            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
+            QByteArray temp_buffer;
+            temp_buffer = this->BinReader->device()->read(this->BinReader->device()->size() - BinReader->device()->pos());
+            // возвращаемся в место записи
+            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
+            BinReader->device()->write(ar);
+            // пишем данные которые должны идти после
+            BinReader->device()->write(temp_buffer);
+        }
+        file.close();
+        return true;
+    }
+    return false;
+}
+
+bool RepReader::convertReplayToSteamVersion()
+{
+    QFile file(replay->FullFileName);
+
+    if(file.open(QIODevice::ReadWrite))
+    {
+        QDataStream in(&file);
+        OpenFile(&in);
+        QByteArray ar;
+        // запишем символы строки разделяя нулями
+        for(int i=0; i<12; ++i) ar.append('\x00');
+
+        // запишем новую версию реплея
+        BinReader->WriteInt32(10);
+        BinReader->device()->seek(replay->BeginFOLDINFO);
+        // изменяем размера блока FOLDINFO
+        BinReader->WriteInt32(replay->LengthFOLDINFO+12*replay->BeginFOLDGPLYz.size());
+        // выполняем проход по всем блокам FOLDGPLY
+        for(int i=0; i<replay->BeginFOLDGPLYz.size(); ++i)
+        {
+            BinReader->device()->seek(replay->BeginFOLDGPLYz.at(i)+i*12);
+            int LengthFOLDGPLY = BinReader->ReadInt32();
+            BinReader->device()->seek(replay->BeginFOLDGPLYz.at(i)+i*12);
+            // изменяем размера блока FOLDGPLY
+            BinReader->WriteInt32(LengthFOLDGPLY + 12);
+            BinReader->ReadChars(16);
+            int LengthDATAINFO = BinReader->ReadInt32();
+            BinReader->device()->seek(BinReader->device()->pos()-4);
+            // изменяем размера блока DATAINFO
+            BinReader->WriteInt32(LengthDATAINFO + 12);
+            int BeginDATAINFO = BinReader->device()->pos();
+            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
+            QByteArray temp_buffer;
+            temp_buffer = this->BinReader->device()->read(this->BinReader->device()->size() - BinReader->device()->pos());
+            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
+            BinReader->device()->write(ar);
+            BinReader->device()->write(temp_buffer);
+        }
+        file.close();
+        return true;
+    }
+    return false;
 }

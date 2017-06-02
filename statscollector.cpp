@@ -16,6 +16,15 @@
 
 using namespace tyti;
 
+BYTE CodeFragmentFT[6] = { 0, 0, 0, 0, 0 };
+BYTE CodeFragmentHT[4] = { 0, 0, 0, 0 };
+DWORD fog_target = 0x008282F0;
+DWORD hpbars_target = 0x00956596;
+BYTE fog_toggle[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+BYTE hpbars_toggle[4] = {0x90, 0x90, 0x90, 0x90};
+//    DWORD dwOldProtectFT = 0;
+//    DWORD dwOldProtectHT = 0;
+
 StatsCollector::StatsCollector(QObject* pobj /*=0*/)
     :QObject(pobj)
 {
@@ -55,45 +64,45 @@ void StatsCollector::start()
     // получаем из файла конфигураций данные о размере буфера
     version = settings.value("info/version", "0.0.0").toString();
     server_addr = settings.value("settings/serverAddr", "http://www.dowstats.h1n.ru/").toString();
-    bool fog = settings.value("settings/disableFog", false).toBool();
-    bool showHP = settings.value("settings/showHP", false).toBool();
     bool enableUpdates = settings.value("settings/enableUpdates", true).toBool();
+    bool mapPackDownloaded = settings.value("info/mapPackDownloaded", false).toBool();
 
     qDebug() << "stats version:" << version;
     qDebug() << "server address:" << server_addr;
 
-    if(enableUpdates){
-    QString filename="SSStatsUpdater.dll";
-    QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY);
-    Request request(url + "&name=ssstats.md5&");
-    QByteArray btar = sender->get(request);
-    QString md5 = QString::fromUtf8(btar.data());
-    qDebug() << "SSStatsUpdater.dll md5 checking...";
-    if(!md5.contains(calcMD5(filename))){
-        qDebug() << "wrong md5, updating...";
-        // код который получает программу для автообновления, создает bat файл и запускает процесс, его выполняющий
-        // bat файл удаляет старую программу для автообновления, а затем переименовывает скачанную новую
-        request.setAddress(url+"&name="+filename+"&");
-        bool success = true;
-        QByteArray btar = sender->getWhileSuccess(request);
-        qDebug() << filename << "successfully downloaded";
-        filename = "SSStatsUpdaterTemp.dll";
-        QFile cur_file(filename);
-        if(cur_file.open(QIODevice::WriteOnly)){
-            cur_file.write(btar);
-            cur_file.close();
+    if(enableUpdates&&!QFile::exists("t_SSStatsUpdater.dll")){
+        QString filename="SSStatsUpdater.dll";
+        QString url = server_addr + "/update.php?key=" + QLatin1String(SERVER_KEY);
+        Request request(url + "&name=ssstats.md5&");
+        QByteArray btar = sender->get(request);
+        QString md5 = QString::fromUtf8(btar.data());
+        qDebug() << "SSStatsUpdater.dll md5 checking...";
+        if(!md5.contains(calcMD5(filename))){
+            qDebug() << "wrong md5, updating...";
+            // код который получает программу для автообновления, создает bat файл и запускает процесс, его выполняющий
+            // bat файл удаляет старую программу для автообновления, а затем переименовывает скачанную новую
+            request.setAddress(url+"&name="+filename+"&");
+            bool success = true;
+            QByteArray btar = sender->getWhileSuccess(request);
+            qDebug() << filename << "successfully downloaded";
+            filename = "SSStatsUpdaterTemp.dll";
+            QFile cur_file(filename);
+            if(cur_file.open(QIODevice::WriteOnly)){
+                cur_file.write(btar);
+                cur_file.close();
+            }
+            else
+                success = false;
+
+            if(success&&md5.contains(calcMD5(filename)))
+                updateUpdater();
+            else
+                cur_file.remove();
         }
         else
-            success = false;
+            qDebug() << "SSStatsUpdater.dll md5 is ok";
+    }
 
-        if(success&&md5.contains(calcMD5(filename)))
-            updateUpdater();
-        else
-            cur_file.remove();
-    }
-    else
-        qDebug() << "SSStatsUpdater.dll md5 is ok";
-    }
     qDebug() << "Player initialization";
     if(!init_player())
     {
@@ -107,6 +116,13 @@ void StatsCollector::start()
     QString path_to_profile = reader->get_cur_profile_dir();
     QFileInfo TSinfo(path_to_profile +"/testStats.lua");
     qDebug() << "path_to_profile:" << path_to_profile;
+
+    if(!mapPackDownloaded)
+        if(download_map_pack())
+        {
+            settings.setValue("info/mapPackDownloaded", 1);
+            settings.sync();
+        }
 
     QDateTime old_time, last_time;
     if(!TSinfo.exists())
@@ -126,6 +142,7 @@ void StatsCollector::start()
     apm_meter->moveToThread(thread);
 
     QObject::connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+    QObject::connect(thread, SIGNAL(finished()), apm_meter, SLOT(deleteLater()));
     QObject::connect(this, SIGNAL(start_meter()), apm_meter, SLOT(start()));
 
     // это надо доработать
@@ -142,11 +159,18 @@ void StatsCollector::start()
         qDebug() << "STATS DISABLED";
     systemWin32 processesInWin;
 
+    bool fogDisabled = false;
+    bool showHP = false;
+    int pCheckCount = 0;
     while(!stop){
         if(enableStats){
             TSinfo.refresh();
             last_time = TSinfo.lastModified();
         }
+        settings.sync();
+        bool tFog = settings.value("settings/disableFog", false).toBool();
+        bool tHP = settings.value("settings/showHP", false).toBool();
+
         // если время последнего изменения файла больше предыдущего
         if((last_time>old_time)){
             int p_num=0, time=0;
@@ -230,11 +254,26 @@ void StatsCollector::start()
             processesInWin.updateProcessList();
             // проверим есть ли процесс игры в списке запущенных
             // если нет, то завершим работу программы
+//            if(checkSS&&!processesInWin.findProcess("Soulstorm"))
+//            {
+//                qDebug() << "process not found";
+//                stop = true;
+//                send_logfile();
+//                break;
+//            }
             if(checkSS&&!processesInWin.findProcess("Soulstorm"))
             {
-                qDebug() << "process not found";
-                stop = true;
+                if(pCheckCount>3)
+                {
+                    qDebug() << "process not found";
+                    send_logfile();
+                    stop = true;
+                    break;
+                }
+                pCheckCount += 1;
             }
+            else
+                pCheckCount = 0;
 
             // проверим валидность карты
             if(!reader->is_map_valid())
@@ -254,19 +293,23 @@ void StatsCollector::start()
             Sleep(5000);
 
             // отключим туман и включим показ хп
-            if(fog&&disableFog(showHP)){
-                qDebug() << "fog disabled";
-                fog = false;
+            if(fogDisabled!=tFog||showHP!=tHP){
+                fogDisabled = tFog;
+                showHP = tHP;
+                processFlags(tHP, tFog);
             }
         }
     }
-    if(thread->isRunning())
-    {
-        apm_meter->stop();
-        thread->exit(0);
-    }
-    if(sender_thread->isRunning())
-        sender_thread->exit(0);
+//    if(thread->isRunning())
+    qDebug() << "apm_meter stop";
+    apm_meter->stop();
+    thread->quit();
+    thread->wait();
+//    if(sender_thread->isRunning())
+    qDebug() << "sender_thread stop";
+    sender_thread->quit();
+    sender_thread->wait();
+    qDebug() << "main stop";
 }
 
 void StatsCollector::download_map(QString map_name)
@@ -304,7 +347,40 @@ void StatsCollector::download_map(QString map_name)
     lpSharedMemory->downloadProgress = 0;
     Sleep(10000);
     memset(lpSharedMemory, 0, sizeof(TGameInfo));
+}
 
+bool StatsCollector::download_map_pack()
+{
+    qDebug() << "Downloading Map Pack";
+
+    QString url_str = server_addr+"/update.php?key=" + QLatin1String(SERVER_KEY);
+    url_str += "&filetype=map&name="+QUrl::toPercentEncoding("SSStatsMapPack",""," ")+".zip";
+    Request request;
+    request.setAddress(url_str);
+
+    QByteArray btar = sender->get(request);
+    if(btar.isEmpty())
+    {
+        qDebug() << "reply is empty";
+        return false;
+    }
+    QFile cur_file("tempMapPack.zip");
+    if(!cur_file.open(QIODevice::WriteOnly))
+    {
+        qDebug() << "could not open file tempMapPack.zip";
+        return false;
+    }
+    cur_file.write(btar);
+    cur_file.close();
+
+    if(decompress("tempMapPack.zip",ss_path,""))
+    {
+        qDebug() << "Download completed successfully";
+        QFile::remove("tempMapPack.zip");
+        return true;
+    }
+    QFile::remove("tempMapPack.zip");
+    return false;
 }
 
 bool StatsCollector::send_logfile()
@@ -369,13 +445,9 @@ void StatsCollector::slotDone(const QUrl &url, const QByteArray &btr)
     qDebug() << "From:" << url;
 }
 
-bool StatsCollector::disableFog(bool showHP)
+void StatsCollector::processFlags(bool tHP, bool tFog)
 {
-    bool success = false;
-    DWORD target = 0x008282F0;
-    DWORD hpbars_target = 0x00956596;
-    BYTE fog_toggle[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
-    BYTE hpbars_toggle[6] = {0x90, 0x90, 0x90, 0x90};
+//    bool success = false;
 
     HWND hWnd = FindWindow(NULL, L"Dawn of War: Soulstorm");
     DWORD PID;
@@ -384,9 +456,23 @@ bool StatsCollector::disableFog(bool showHP)
 
     if(hProcess)
     {
-        success = WriteProcessMemory(hProcess, (PVOID)target, fog_toggle, 6, NULL)!=0;
-        if(showHP)
+        if(tFog)
+        {
+            ReadProcessMemory(hProcess, (PVOID)fog_target, CodeFragmentFT, 6, NULL);
+            WriteProcessMemory(hProcess, (PVOID)fog_target, fog_toggle, 6, NULL);
+        }
+        else
+            WriteProcessMemory(hProcess, (PVOID)fog_target, CodeFragmentFT, 6, NULL);
+
+        if(tHP)
+        {
+            ReadProcessMemory(hProcess, (PVOID)hpbars_target, CodeFragmentHT, 4, NULL);
             WriteProcessMemory(hProcess, (PVOID)hpbars_target, hpbars_toggle, 4, NULL);
+        }
+        else
+            WriteProcessMemory(hProcess, (PVOID)hpbars_target, CodeFragmentHT, 4, NULL);
+
+//            VirtualProtect((PBYTE)pEndScene, 8, PAGE_EXECUTE_READWRITE, &dwOldProtectES);
 
         CloseHandle(hProcess);
     }
@@ -404,7 +490,7 @@ bool StatsCollector::disableFog(bool showHP)
     //Free the buffer.
 //    LocalFree(messageBuffer);
 
-    return success;
+//    return success;
 }
 
 QString StatsCollector::calcMD5(QString fileName)
@@ -525,11 +611,14 @@ QString StatsCollector::get_soulstorm_installlocation()
 
 StatsCollector::~StatsCollector()
 {
+    qDebug() << "UnmapViewOfFile";
     UnmapViewOfFile(lpSharedMemory);
+    qDebug() << "CloseHandle";
     CloseHandle(hSharedMemory);
-    log.finishLog();
+    qDebug() << "delete reader";
     delete reader;
-    delete apm_meter;
+    qDebug() << "StatsCollector destructor";
+    log.finishLog();
 }
 
 bool StatsCollector::decompress(const QString& file, const QString& out, const QString& pwd)

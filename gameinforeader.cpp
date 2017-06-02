@@ -327,6 +327,10 @@ int GameInfoReader::search_info(QString profile)
         // прочитаем реплей
         rep_reader.ReadReplayFully(&in, pfile.fileName());
 
+        // конвертируем реплей в стимовскую версию
+        if(rep_reader.replay->Version==9)
+            rep_reader.convertReplayToSteamVersion();
+
         // переименовываем название реплея в игре по стандарту
         playback_name = rep_reader.RenameReplay()+".rec";
         qDebug() << playback_name;
@@ -386,7 +390,6 @@ QStringList GameInfoReader::get_players(QString profile)
     int players_count = GSGameStats.value("Players").toInt(); // количество игроков
 
     QStringList result;
-//    result.reserve(8);
     QList<QVariantMap> players;
     int sender_team, sender_id=-1;
     for(int i=0; i<players_count;++i)
@@ -403,16 +406,25 @@ QStringList GameInfoReader::get_players(QString profile)
         }
         players << player;
     }
+    QMap<QString, QString> races;
+    races.insert("necron_race", "Necrons");
+    races.insert("chaos_marine_race", "Chaos");
+    races.insert("space_marine_race", "Space Marines");
+    races.insert("dark_eldar_race", "Dark Eldar");
+    races.insert("eldar_race", "Eldar");
+    races.insert("sisters_race", "Sisters of Battle");
+    races.insert("tau_race", "Tau Empire");
+    races.insert("ork_race", "Orks");
+    races.insert("guard_race", "Imperial Guard");
+
     if(sender_id!=-1)
         for(int i=0; i<players.size();++i)
         {
             if(players.at(i).value("PTeam")!=sender_team)
                 result << QString(players.at(i).value("PName").toString()+" - "+
-                                   players.at(i).value("PRace").toString());
+                                   races.value(players.at(i).value("PRace").toString()));
             else
                 result << QStringList();
-//            QString(players.at(i).value("PName").toString()+" - "+
-
         }
     else
         return QStringList();

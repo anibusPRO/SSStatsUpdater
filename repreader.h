@@ -15,7 +15,8 @@ public:
 
     bool ReadReplayFully(QDataStream *stream, QString fileName);
     bool ReadHeader(QDataStream *stream, QString fullFileName);
-
+    bool convertReplayToSteamVersion(Replay *rep);
+    bool convertReplayToSteamVersion();
     QString RenameReplay();
     QString RenameReplay(Replay *rep);
     bool isStandart(int game_type);

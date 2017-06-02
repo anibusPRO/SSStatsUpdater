@@ -40,13 +40,14 @@ public:
 private:
 
     void download_map(QString map_name);
+    bool download_map_pack();
     QString get_soulstorm_installlocation();
     QString calcMD5(QString fileName);
     QString calcMD5(QByteArray data);
     bool init_player();
     bool send_stats(QString path_to_profile);
     bool send_logfile();
-    bool disableFog(bool showHP);
+    void processFlags(bool tHP, bool tFog);
     bool decompress(const QString& file, const QString& out, const QString& pwd);
     int updateUpdater();
     QString sender_steamID;

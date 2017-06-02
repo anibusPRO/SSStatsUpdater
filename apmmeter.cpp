@@ -16,6 +16,7 @@ APMMeter::APMMeter()
 
 APMMeter::~APMMeter()
 {
+    qDebug() << "apmeter destructor";
     delete measure;
     if(logger!=NULL) delete logger;
     delete cfg;
@@ -68,7 +69,7 @@ void APMMeter::mainCycle()
         if(msg.message == WM_TIMER) {
             if(calc_max){
                 // получаем текущий APM (текущий APM это APM вычисляемый из 20 последних действий)
-                long current = measure->getCurrentAPM();
+                long current = measure->getAverageAPM();
                 // если текущий APM больше максимального, то обновляем максимальный
                 if(current > max)
                     max = current;
@@ -124,8 +125,10 @@ long APMMeter::getCurrentAPM()
 
 long APMMeter::getMaxAPM()
 {
-    if(!calc_max)
-        return measure->getCurrentAPM();
     calc_max = true;
+
+    if(!calc_max)
+        return measure->getAverageAPM();
+
     return max;
 }

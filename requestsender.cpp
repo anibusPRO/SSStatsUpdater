@@ -21,6 +21,7 @@ RequestSender::~RequestSender()
 {
     if(file!=nullptr)
         delete file;
+    qDebug() << "RequestSender destructor";
 }
 
 void RequestSender::setProxy(const QNetworkProxy& proxy)
@@ -70,9 +71,9 @@ RequestSender::RequestError RequestSender::error() const
 
 QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true*/)
 {
-    QTimer timer;
-    timer.setInterval(_maxWaitTime);
-    timer.setSingleShot(true);
+//    QTimer timer;
+//    timer.setInterval(_maxWaitTime);
+//    timer.setSingleShot(true);
 
     QEventLoop loop;
     QSharedPointer<QNetworkAccessManager> manager(new QNetworkAccessManager);
@@ -90,42 +91,37 @@ QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true
     QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
 
     if (getRequest)
-    {
-        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), &timer, SLOT(start()));
+//    {
+//        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), &timer, SLOT(start()));
         QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
 //        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updateProgress(qint64,qint64)));
-    }
-    else
-        QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), &timer, SLOT(start()));
+//    }
+//    else
+//        QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), &timer, SLOT(start()));
 
-    QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
+//    QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
 
-    timer.start();
+//    timer.start();
     loop.exec();
 
     QByteArray data;
-    int network_error = 0;
     if (reply->isFinished())
     {
-        network_error = reply->error();
-        if(network_error==QNetworkReply::NoError)
-        {
+        int network_error = reply->error();
+        if(network_error==QNetworkReply::NoError&&reply->isReadable()){
+            _error = NoError;
             data = reply->readAll();
-            _error = RequestSender::NoError;
         }
-        else
-            _error = RequestSender::NetworkError;
+        else{
+            _error = NetworkError;
+            qDebug() << "\n Network Error:"
+                     << network_error << "\n"
+                     << reply->errorString() << "\n"
+                     << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                     << reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()
+                     << reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+        }
     }
-    else
-        _error = RequestSender::TimeoutError;
-
-    if(_error!=NoError)
-        qDebug() << "Reply Error:"
-                 << network_error << _error << "\n"
-                 << reply->errorString() << "\n"
-                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                 << reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();
-
     reply->deleteLater();
 
     return data;
@@ -142,6 +138,10 @@ QByteArray RequestSender::sendWhileSuccess(Request& request, int maxCount /*= 2*
         answer = getRequest ? get(request) : post(request);
         if (error() == NoError)
             break;
+        if(error()==1)
+            qDebug() << "TimeoutError";
+        if(error()==2)
+            qDebug() << "NetworkError";
         Sleep(2000);
     }
 

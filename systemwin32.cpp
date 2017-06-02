@@ -2,7 +2,7 @@
 
 systemWin32::systemWin32()
 {
-    hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (hSnap == NULL)
     {
@@ -26,16 +26,17 @@ systemWin32::systemWin32()
             win32sysMap[proc.th32ProcessID] = filename;
         }
     }
+    CloseHandle(hSnap);
 }
 
 systemWin32::~systemWin32()
 {
-    CloseHandle(hSnap);
+
 }
 
 void systemWin32::updateProcessList()
 {
-    hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     win32sysMap.clear();
 
     if (hSnap == NULL)
@@ -59,6 +60,7 @@ void systemWin32::updateProcessList()
             win32sysMap[proc.th32ProcessID] = filename;
         }
     }
+    CloseHandle(hSnap);
 }
 
 // принимает имя процесса, возвращает true, если процесс запущен
@@ -76,6 +78,11 @@ bool systemWin32::findProcess(QString findProcName)
     }
 
     return false;
+}
+
+void systemWin32::closehSnapHandle()
+{
+//    CloseHandle(hSnap);
 }
 
 // считает количество процессов с данным именем и возвращает результат

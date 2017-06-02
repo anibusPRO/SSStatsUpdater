@@ -2,6 +2,7 @@
 #define Replay_H
 #include <QString>
 #include <QMap>
+#include <QVector>
 #include "game_action.h"
 #include "player.h"
 #include "gamesettings.h"
@@ -36,8 +37,8 @@ public:
     int DataBaseChunkSize;
     long BeginDataBaseChunkSize;
 
-    QList<long> BeginFOLDGPLYz;
-    QList<long> BeginPlayerDiffirences;
+    QVector<long> BeginFOLDGPLYz;
+    QVector<long> BeginPlayerDiffirences;
     QMap<long, int> BeginPlayersChunkDataSizes;
 
     QString Name;
