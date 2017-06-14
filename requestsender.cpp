@@ -7,32 +7,85 @@
 #include <QtNetwork>
 #include "requestsender.h"
 
-RequestSender::RequestSender(qint64 maxWaitTime /*= 35000*/)
+
+void RequestSender::map(QNetworkReply *reply)
+{
+     m_mapper.map(reply);
+}
+
+RequestSender::RequestSender(qint64 maxWaitTime /*= 35000*/, QObject *parent) : QObject{parent}
 {
     setMaxWaitTime(maxWaitTime);
     _error = NoError;
-    file = nullptr;
-    m_pnam = new QNetworkAccessManager(this);
-    connect(m_pnam, SIGNAL(finished(QNetworkReply*)),
-    this, SLOT(slotFinished(QNetworkReply*)));
+    m_manager = new QNetworkAccessManager(this);
+//    connect(m_manager, SIGNAL(finished(QNetworkReply*)),
+//    this, SLOT(slotFinished(QNetworkReply*)));
+    connect(m_manager, SIGNAL(finished(QNetworkReply*)), SLOT(map(QNetworkReply*)));
+    connect(&m_mapper, SIGNAL(mapped(QString)), SLOT(onFeedRetrieved(QString)));
+
+}
+
+void RequestSender::onFeedRetrieved(const QString &fileName)
+{
+//   qDebug() << "onFeedRetrieved" << QThread::currentThreadId() << fileName;
+   auto *pnr = qobject_cast<QNetworkReply*>(m_mapper.mapping(fileName));
+
+   QVariant redirectionTarget = pnr->attribute(QNetworkRequest::RedirectionTargetAttribute);
+   if (pnr->error() != QNetworkReply::NoError){
+       qDebug() << pnr->error()
+                << pnr->errorString()
+                << pnr->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                << pnr->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()
+                << pnr->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+   }
+   else if (!redirectionTarget.isNull()) {
+       QUrl newUrl = pnr->url().resolved(redirectionTarget.toUrl());
+       QNetworkAccessManager *manager = pnr->manager();
+       QNetworkRequest redirection(newUrl);
+       QNetworkReply *newReply = manager->get(redirection);
+       m_mapper.setMapping(newReply, fileName);
+       pnr->deleteLater();
+       return;
+   }
+   else if(!fileName.isEmpty()){
+       qDebug() << "Downloading" << fileName << pnr->header(QNetworkRequest::ContentLengthHeader).toInt();
+       QByteArray btar = pnr->readAll();
+       if(!btar.isEmpty())
+       {
+           QFile cur_file(fileName);
+           if(cur_file.open(QIODevice::WriteOnly)){
+               cur_file.write(btar);
+               cur_file.close();
+               qDebug() << fileName << "downloaded successfully";
+               if(fileName.section(".",1,1)=="zip"&&decompress(cur_file.fileName(),QFileInfo(fileName).absolutePath(),""))
+               {
+                   qDebug() << fileName << "unpacked successfully";
+                   QFile::remove(fileName);
+               }
+           }
+           else
+               qDebug() << "Could not open" << fileName;
+       }
+       else
+           qDebug() << "Reply is empty";
+   }
+   else
+   {
+       QString reply = QString::fromUtf8(pnr->readAll().data());
+       if(!reply.isEmpty())
+           qDebug() << reply.remove("<br>");
+   }
 }
 
 RequestSender::~RequestSender()
 {
-    if(file!=nullptr)
-        delete file;
-    qDebug() << "RequestSender destructor";
+    delete m_manager;
 }
 
 void RequestSender::setProxy(const QNetworkProxy& proxy)
 {
     _proxy = proxy;
 }
-
-//QByteArray *RequestSender::getFile()
-//{
-//    return file;
-//}
 
 QByteArray RequestSender::get(Request& request)
 {
@@ -90,10 +143,10 @@ QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true
 
     QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
 
-    if (getRequest)
+//    if (getRequest)
 //    {
 //        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), &timer, SLOT(start()));
-        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
+//        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
 //        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updateProgress(qint64,qint64)));
 //    }
 //    else
@@ -153,43 +206,35 @@ void RequestSender::updateProgress(qint64 bytesSent, qint64 bytesTotal)
 //    qDebug() << (int)(100*bytesSent/bytesTotal;
 }
 
-void RequestSender::get(QString url)
+void RequestSender::GET_REQUEST(QString url, QString fileName)
 {
     Request request;
     request.setAddress(url);
     QNetworkRequest req = request.request();
     req.setRawHeader("User-Agent", "SSStats");
-//    qDebug() << req.header(QNetworkRequest::ContentLengthHeader).toString();
-//    qDebug() << req.header(QNetworkRequest::ContentTypeHeader).toString();
-//    foreach(QByteArray str, req.rawHeaderList())
-//        qDebug() << QString::fromUtf8(str.data());
-    m_pnam->get(req);
+
+    auto reply = m_manager->get(req);
+    // Ensure a unique mapping
+//    Q_ASSERT(m_mapper.mapping(dataModel) == nullptr);
+
+//    qDebug() << "setMapping" << reply << fileName;
+    m_mapper.setMapping(reply, fileName);
 }
 
-void RequestSender::post(QString url, QString name, QString content, QByteArray data)
+void RequestSender::POST_REQUEST(QString url, QString name, QString content, QByteArray data)
 {
     Request request;
     request.setAddress(url);
     request.setFile(data,name,content);
-//    qDebug() << data.size() <<
     QNetworkRequest req = request.request(false);
-
-//    QSslConfiguration config = req;
-//    QList<QSslCertificate> certs =
-//                          QSslCertificate::fromPath("pistopoiitiko.crt");
-//    config.setCaCertificates(certs);
-//    request.setSslConfiguration(config);
     req.setRawHeader("User-Agent", "SSStats");
-//    qDebug() << req.header(QNetworkRequest::ContentLengthHeader).toString();
-//    qDebug() << req.header(QNetworkRequest::ContentTypeHeader).toString();
-//    foreach(QByteArray str, req.rawHeaderList())
-//        qDebug() << QString::fromUtf8(str.data());
-//    qDebug() << QString::fromUtf8(request.data(false).data());
-    m_pnam->post(req, request.data(false));
+
+    m_manager->post(req, request.data(false));
 }
 
 void RequestSender::slotFinished(QNetworkReply* pnr)
 {
+    qDebug() << "slotFinished" << QThread::currentThreadId ();
     QVariant redirectionTarget = pnr->attribute(QNetworkRequest::RedirectionTargetAttribute);
     if (pnr->error() != QNetworkReply::NoError){
         qDebug() << pnr->error()
@@ -200,35 +245,65 @@ void RequestSender::slotFinished(QNetworkReply* pnr)
     }
     else if (!redirectionTarget.isNull()) {
         QUrl newUrl = pnr->url().resolved(redirectionTarget.toUrl());
-        emit get(newUrl.toString());
+        QNetworkAccessManager *manager = pnr->manager();
+        QNetworkRequest redirection(newUrl);
+        QNetworkReply *newReply = manager->get(redirection);
         pnr->deleteLater();
         return;
     }
-
-//    if(file!=nullptr)
-//        delete file;
-//    if(pnr->isReadable())
-//        file = new QByteArray(pnr->readAll());
-    QString reply = QString::fromUtf8(pnr->readAll().data());
-    if(!reply.isEmpty())
-        qDebug() << reply.remove("<br/>");
+    else
+    {
+        QString reply = QString::fromUtf8(pnr->readAll().data());
+        if(!reply.isEmpty())
+            qDebug() << reply.remove("<br>");
+    }
 
     pnr->deleteLater();
-
-//    QString fileName = QFileInfo(QUrl(urlLineEdit->text()).path()).fileName();
-//    statusLabel->setText(tr("Downloaded %1 to %2.").arg(fileName).arg(QDir::currentPath()));
-
-//    foreach(QByteArray str, pnr->rawHeaderList())
-//        qDebug() << QString::fromUtf8(str.data());
-//    qDebug() << pnr->size() << pnr->url();
-//    else
-//        emit done(pnr->url(), pnr->readAll());
-//    qDebug() << pnr->isReadable() << pnr->isFinished();
-
-//
-
-
 }
+
+bool RequestSender::decompress(const QString& file, const QString& out, const QString& pwd)
+{
+    if (!QFile::exists(file))
+    {
+        qDebug() << "File does not exist.";
+        return false;
+    }
+
+    UnZip::ErrorCode ec;
+    UnZip uz;
+
+    if (!pwd.isEmpty())
+        uz.setPassword(pwd);
+
+    ec = uz.openArchive(file);
+    if (ec != UnZip::Ok)
+    {
+        qDebug() << "Failed to open archive: " << uz.formatError(ec).toLatin1().data();
+        return false;
+    }
+
+    ec = uz.extractAll(out);
+    if (ec != UnZip::Ok)
+    {
+        qDebug() << "Extraction failed: " << uz.formatError(ec).toLatin1().data();
+        uz.closeArchive();
+        return false;
+    }
+
+    return true;
+}
+
+//#ifndef QT_NO_SSL
+//void RequestSender::sslErrors(QNetworkReply* reply, const QList<QSslError> &errors)
+//{
+//    foreach (const QSslError &error, errors) {
+//        qDebug() << error.errorString();
+//    }
+
+//    reply->ignoreSslErrors();
+//}
+//#endif
+
 //void HttpWindow::httpFinished()
 //{
 //    if (httpRequestAborted) {
@@ -277,16 +352,4 @@ void RequestSender::slotFinished(QNetworkReply* pnr)
 //    delete file;
 //    file = 0;
 //}
-
-
-//#ifndef QT_NO_SSL
-//void RequestSender::sslErrors(QNetworkReply* reply, const QList<QSslError> &errors)
-//{
-//    foreach (const QSslError &error, errors) {
-//        qDebug() << error.errorString();
-//    }
-
-//    reply->ignoreSslErrors();
-//}
-//#endif
 

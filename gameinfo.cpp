@@ -92,17 +92,20 @@ QString GameInfo::get_steam_id()
     return _steam_id;
 }
 
-QString GameInfo::get_params(QString site_addr)
+QString GameInfo::get_stats(QString site_addr)
 {
     // добавим имена игроков
     for(int i=0; i<_players_count; ++i)
     {
+
         QByteArray btr = _players.at(i).name.toUtf8();
         QString p_name(btr.toHex());
 
         // записываем имена игроков
         site_addr += "p" + QString::number(i+1) + "="
                 + p_name + "&";
+        site_addr += "sid" + QString::number(i+1) + "="
+                + _players.at(i).sid + "&";
 
 //        // записываем apm из реплея для каждого игрока
 //        site_addr += "apm" + QString::number(i+1) + "="
@@ -138,18 +141,14 @@ QString GameInfo::get_params(QString site_addr)
     site_addr += "map=" + _map_name + "&";
     // добавим продолжительность игры
     site_addr += "gtime=" + QString::number(_duration) + "&";
-    // добавим имя отправителя
-//    site_addr += "name=" + _sender_name + "&";
     // добавим steam id отправителя
     site_addr += "sid=" + _steam_id + "&";
     // добавим названием мода
     site_addr += "mod=" + _mod_name + "&";
     // добавим условие победы
     site_addr += "winby=" + _winby + "&";
-    qDebug() << site_addr;
-    // добавим ключ
-    site_addr += "key=" + QLatin1String(SERVER_KEY) + "&";
 
+    qDebug() << site_addr;
     return site_addr;
 }
 
@@ -169,11 +168,12 @@ void GameInfo::update_player(int id, int state)
     _players[id].fnl_state = state;
 }
 
-void GameInfo::add_player(QString name, QString race, int team_id, int state, int apm)
+void GameInfo::add_player(QString name, QString race, int team_id, int state, QString sid, int apm)
 {
-    qDebug() << "Adding player:" << name << race << team_id << state;
+    qDebug() << "Adding player:" << name << race << team_id << state << sid;
     TSPlayer p;
     p.name = name;
+    p.sid = sid;
     p.race = race;
     p.team = team_id;
     p.apm = apm;

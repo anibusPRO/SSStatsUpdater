@@ -8,9 +8,11 @@
 #include "gameinfo.h"
 #include "logger.h"
 #include "apmmeter.h"
+#include "monitor.h"
 #include <QCoreApplication>
+#include <QTimer>
+#include "defines.h"
 
-#define STEAM_API_KEY "B09655A1E41B5DE93AD3F27087D25884"
 
 typedef struct{
     int AverageAPM;
@@ -29,53 +31,57 @@ class StatsCollector : public QObject
 public:
     StatsCollector(QObject* pobj=0);
     ~StatsCollector();
-    void start();
 
-    // для хранения текущего активного профиля
-    // имя папки профиля можно узнать так же из файла Local.ini
-//    QString _cur_profile;
+    bool start();
     // флаг опредляющий выполнение основного цикла работы программы
     bool stop=false;
+    QTimer stats_timer;
 
 private:
 
-    void download_map(QString map_name);
-    bool download_map_pack();
+    void download_map(QString map_name, bool enableDXHook);
     QString get_soulstorm_installlocation();
     QString calcMD5(QString fileName);
     QString calcMD5(QByteArray data);
     bool init_player();
     bool send_stats(QString path_to_profile);
     bool send_logfile();
-    void processFlags(bool tHP, bool tFog);
-    bool decompress(const QString& file, const QString& out, const QString& pwd);
-    int updateUpdater();
+    void processFlags();
+
     QString sender_steamID;
     QString sender_name;
     QString server_addr;
+    bool enableDXHook;
+    bool enableStats;
+    bool curFog;
+    bool curHP;
     QString version;
     QString ss_path;
     QCoreApplication *app;
     RequestSender* sender;
     GameInfoReader* reader;
-    APMMeter *apm_meter;
     Logger log;
     HANDLE hSharedMemory;
     PGameInfo lpSharedMemory;
     QThread *sender_thread;
+    QThread* apm_thread;
+    QThread* monitor_thread;
+    QDateTime cur_time;
+    Monitor monitor;
+    APMMeter apm_meter;
 
 signals:
-    void start_meter();
-    void post(QString url,
+    void start_apm_meter();
+    void start_monitor();
+    void POST_REQUEST(QString url,
               QString name,
               QString content,
               QByteArray data);
-    void get(QString url);
+//    void GET_REQUEST(QString url);
+    void GET_REQUEST(QString url, QString fileName="");
 
 private slots:
-//    void slotError ( );
-    void updateProgress(qint64 bytesSent, qint64 bytesTotal);
-    void slotDone (const QUrl&url, const QByteArray&btr);
+    void check_game();
 };
 
 #endif // STATSCOLLECTOR_H

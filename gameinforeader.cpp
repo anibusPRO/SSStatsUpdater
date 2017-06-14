@@ -36,35 +36,27 @@ GameInfoReader::GameInfoReader()
 //                  "Steam response does not contain personaname"<<                         /*15*/
 //                  "Sender is not player"<<
 //                  "Winners count less than game type"<<                                   /*26*/
+    is_playback = false;
+}
+
+GameInfoReader::~GameInfoReader()
+{
+}
+
+void GameInfoReader::init(QString path, QString SID, QString name)
+{
+    ss_path = path;
+    sender_steamID = SID;
+    sender_name = name;
+}
+
+void GameInfoReader::reset()
+{
     last_playback  = 0;
     last_startgame = 0;
     last_stopgame  = 0;
     last_ending_mission = 0;
     playback_error = 0;
-    _game_info = 0;
-    is_playback = false;
-    profile_error = true;
-}
-
-GameInfoReader::~GameInfoReader()
-{
-    if(_game_info) delete _game_info;
-}
-
-void GameInfoReader::set_ss_path(const QString &value)
-{
-    ss_path = value;
-}
-
-void GameInfoReader::set_account(QString SID, QString name)
-{
-    sender_steamID = SID;
-    sender_name = name;
-}
-
-QString GameInfoReader::get_steam_id() const
-{
-    return sender_steamID;
 }
 
 int GameInfoReader::readySend()
@@ -88,78 +80,64 @@ int GameInfoReader::readySend()
     return 0;
 }
 
-QString GameInfoReader::get_cur_profile_dir()
+QString GameInfoReader::find_profile()
 {
-    QDir temp_dir(ss_path+"/Profiles");
+    QDir profiles_dir(ss_path+"/Profiles");
     QString name;
     for(int i=0; i<3&&name.isEmpty();++i)
     {
         name = read_warnings_log("Using player profile", 3, 5);
         Sleep(3000);
     }
-    QString profile = "Profile1";
-    // если имя профиля не изменилось, то отправим пустую строку, как знак того что профиль не сменился
+
+    QSettings settings("Local.ini", QSettings::IniFormat);
+    QString LocalINIProfile = settings.value("global/playerprofile", "Profile1").toString();
+
     if(name.isEmpty())
-        return QString(ss_path +"/Profiles/"+ profile);
-    if(name!=cur_profile_name)
-        qDebug() << "cur profile name:" << name << cur_profile_name;
+        return QString(ss_path+"/Profiles/"+LocalINIProfile);
 
-    QStringList profiles = temp_dir.entryList();
-    if(!profiles.isEmpty())
-        foreach (QString file, profiles)
+    QFile nameDat(ss_path+"/Profiles/"+LocalINIProfile+"/name.dat");
+    if (nameDat.exists()&&nameDat.open(QIODevice::ReadOnly))
+    {
+        QString str = QString::fromUtf16((ushort*)nameDat.readLine().data());
+        nameDat.close();
+        if(name == str)
+            return QString(ss_path+"/Profiles/"+LocalINIProfile);
+    }
+
+    foreach (QString profile, profiles_dir.entryList(QDir::Dirs))
+    {
+        if(profile.size()<8)
+            continue;
+        QFile nameDat(profiles_dir.path()+"/"+profile+"/name.dat");
+        QString str="";
+        if (nameDat.exists()&&nameDat.open(QIODevice::ReadOnly))
         {
-            if(file!="."&&file!="..")
-            {
-                if(QDir(temp_dir.path()+"/"+file).exists())
-                {
-                    if(temp_dir.cd(file))
-                    {
-                        QFile temp(temp_dir.path()+"/name.dat");
-                        QString str="";
-                        if (temp.open(QIODevice::ReadOnly))
-                        {
-                            QDataStream in(&temp);
-                            int filesize = temp.size()-2;
-                            char *bytes = new char[filesize];
-                            in.device()->seek(2);
-                            in.readRawData(bytes, filesize);
-                            str = QString::fromUtf16((ushort*)bytes).left(filesize/2);
-                            temp.close();
-                            delete[] bytes;
-                        }
-                        else
-                        {
-                            if(!profile_error)
-                            {
-                                qDebug() << temp_dir.path();
-                                qDebug() << "Could not open name.dat";
-                                profile_error = false;
-                            }
-                            temp_dir.cdUp();
-                            continue;
-                        }
-                        if(name == str)
-                        {
-                            profile = file;
-                            cur_profile_name = str;
-                            break;
-                        }
-                        else if(!profile_error)
-                        {
-                            qDebug() << name << str;
-                            profile_error = false;
-                        }
-                        temp_dir.cdUp();
-                    }
-                    else
-                        qDebug() << "debug 2";
-                }
-                else
-                    qDebug() << "debug 1";
-            }
+            str = QString::fromUtf16((ushort*)nameDat.readLine().data());
+            nameDat.close();
         }
-    return QString(ss_path +"/Profiles/"+ profile);
+        else
+        {
+            qDebug() << "Could not open" << nameDat.fileName();
+            continue;
+        }
+        if(name == str)
+            return QString(ss_path+"/Profiles/"+profile);
+        else
+            qDebug() << name << str;
+    }
+    return QString(ss_path+"/Profiles/"+LocalINIProfile);
+}
 
+QString GameInfoReader::get_cur_profile_dir()
+{
+    QString profile = find_profile();
+    if(cur_profile_folder!=profile)
+    {
+        cur_profile_folder = profile;
+        qDebug() << "path to profile:" << cur_profile_folder;
+    }
+    return cur_profile_folder;
 }
 
 bool GameInfoReader::is_map_valid()
@@ -190,28 +168,14 @@ QString GameInfoReader::get_playback_name() const
 {
     return playback_name;
 }
-
-void GameInfoReader::setTotalActions(long n)
+QString GameInfoReader::get_game_stats() const
 {
-    TotalActions = n;
-}
-QString GameInfoReader::get_game_info(QString profile)
-{
-    int e_code = search_info(profile);
-    if(e_code<errors_list.size())
-        qDebug() << errors_list.at(e_code);
-    else
-        qDebug() << "error code is da biggest";
-    QString info;
-    if(e_code==0)
-        info = _game_info->get_params();
-    if(e_code>10) delete _game_info;
-    return info;
+    return game_stats;
 }
 
-int GameInfoReader::search_info(QString profile)
+int GameInfoReader::read_game_info(QMap<QString, QString> *sids, long totalActions)
 {
-    QFile file(profile + "/testStats.lua");
+    QFile file(cur_profile_folder + "/testStats.lua");
 
     if(!file.open(QIODevice::ReadOnly))
         return 1;
@@ -246,11 +210,11 @@ int GameInfoReader::search_info(QString profile)
     if(team_num!=2) return 9;
     if(duration<MINIMUM_DURATION) return 10;
 
-    double AverageAPM = (double)TotalActions*60.0f/(double)duration;
+    double AverageAPM = (double)totalActions*60.0f/(double)duration;
     qDebug() << "WinBy:" << winby.toUpper();
     qDebug() << "AverageAPM with testStats duration:" << AverageAPM;
 
-    _game_info = new GameInfo(players_count);
+    GameInfo game_info(players_count);
 
     // если настройки игры стандартные, то отправим статистику
     int teams[8] = {0};
@@ -274,7 +238,7 @@ int GameInfoReader::search_info(QString profile)
         p_name = player.value("PName").toString();
         if(sender_name==p_name)
         {
-            _game_info->set_sender_name(p_name);
+            game_info.set_sender_name(p_name);
             fnl_state = player.value("PFnlState").toInt();
             sender_id = i;
         }
@@ -282,27 +246,30 @@ int GameInfoReader::search_info(QString profile)
             fnl_state = player.value("PFnlState").toInt();
 
         if(fnl_state==5) winners_count++;
-        _game_info->add_player(p_name, player.value("PRace").toString(),
-                                   player.value("PTeam").toInt(), fnl_state/*, rep_reader.GetAverageAPM(i)*/);
+        game_info.add_player(p_name,
+                               player.value("PRace").toString(),
+                               player.value("PTeam").toInt(),
+                               fnl_state,
+                               sids->value(p_name));
     }
 
     if(teams[0]!=teams[1]) return 15;
     int game_type = teams[0];
     if(sender_id!=-1&&winby.isEmpty())
     {
-        int sender_team = _game_info->getPlayer(sender_id).team;
+        int sender_team = game_info.getPlayer(sender_id).team;
         int loseleavers=1;
         for(int i=0; i<players_count; ++i)
-            if((i!=sender_id&&_game_info->getPlayer(i).team == sender_team)&&
-                    (_game_info->getPlayer(i).fnl_state!=1))
+            if((i!=sender_id&&game_info.getPlayer(i).team == sender_team)&&
+                    (game_info.getPlayer(i).fnl_state!=1))
                         ++loseleavers;
         if(loseleavers==game_type)
         {
             winby = "ANNIHILATE";
             for(int i=0; i<players_count; ++i)
-                if(_game_info->getPlayer(i).team != sender_team)
+                if(game_info.getPlayer(i).team != sender_team)
                 {
-                    _game_info->update_player(i, 5);
+                    game_info.update_player(i, 5);
                     winners_count++;
                 }
         }
@@ -310,7 +277,7 @@ int GameInfoReader::search_info(QString profile)
     // раньше это условие срабартывало когда игрок ливал и мы не отправляли статистику,
     // теперь же, статистика будет отправлять даже в тако случе
 //    if(winners_count!=game_type) return 24;
-    _game_info->set_winby(winby.isEmpty()?"disconnect":winby);
+    game_info.set_winby(winby.isEmpty()?"disconnect":winby);
     _playback.clear();
     if(last_startgame > playback_error)
     {
@@ -344,29 +311,38 @@ int GameInfoReader::search_info(QString profile)
         // теперь, если игрок обозреватель, то пусть отправляет статистику как ливер
         // все таки обозреватель может ливнуть в любой момент и реплей может быть не полным
         // но зато хоть какой-то реплей будет
-        if(rep_reader.playerIsObserver(_game_info->get_sender_name()))
-//            return 23;
-            _game_info->set_winby("disconnect");
+        if(rep_reader.playerIsObserver(game_info.get_sender_name()))
+            game_info.set_winby("disconnect");
     }
     else
         qDebug() << "REC -- Error opening file playback:temp.rec for write";
 
     QString mod_name = read_warnings_log("MOD -- Initializing Mod", 4);  // имя запущенного мода
 
-    _game_info->set_steam_id(sender_steamID);
-    _game_info->set_APMR(AverageAPM);
-    _game_info->set_type(game_type);
-    _game_info->set_team_number(team_num);
-    _game_info->set_duration(duration);
-    _game_info->set_map_name(GSGameStats.value("Scenario").toString());
-    _game_info->set_mod_name(mod_name);
+    game_info.set_steam_id(sender_steamID);
+    game_info.set_APMR(AverageAPM);
+    game_info.set_type(game_type);
+    game_info.set_team_number(team_num);
+    game_info.set_duration(duration);
+    game_info.set_map_name(GSGameStats.value("Scenario").toString());
+    game_info.set_mod_name(mod_name);
+
+    game_stats = game_info.get_stats();
 
     return 0;
 }
 
-QStringList GameInfoReader::get_players(QString profile)
+void GameInfoReader::get_error_debug(int e_code)
 {
-    QFile file(profile + "/testStats.lua");
+    if(e_code<errors_list.size())
+        qDebug() << errors_list.at(e_code);
+    else
+        qDebug() << "unknown error code " << e_code;
+}
+
+QStringList GameInfoReader::get_players()
+{
+    QFile file(cur_profile_folder + "/testStats.lua");
     if(!file.open(QIODevice::ReadOnly))
         return QStringList();
     if(!file.isReadable())
@@ -431,7 +407,6 @@ QStringList GameInfoReader::get_players(QString profile)
     return result;
 }
 
-
 QString GameInfoReader::get_last_invalid_map() const
 {
     return last_invalid_map;
@@ -439,7 +414,7 @@ QString GameInfoReader::get_last_invalid_map() const
 
 QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int count/*=1*/)
 {
-    QString out="";
+    QString out;
     QFile file(ss_path+"/warnings.log");
 
     if(!file.open(QIODevice::ReadOnly))
@@ -466,10 +441,10 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
         // читаем следующую строку из файла
         QString line = fileLines.at(counter-1);
         // если текущаю строка содержит переданную в параметрах строку
-        if(line.contains(str/*, Qt::CaseInsensitive*/))
+        if(line.contains(str))
         {
             // результат поиска
-            out="";
+            out.clear();
             // удаляем запятые из прочитанной строки
             line = line.remove(',');
             line = line.remove("\n");
@@ -495,7 +470,7 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
                 else
                     qDebug() << "out of range" << first_word << str << counter;
             }
-            if(out!="")
+            if(!out.isEmpty())
                 out = out.left(out.size()-1);
 
         }
@@ -517,7 +492,7 @@ QString GameInfoReader::read_warnings_log(QString str, int offset/*=0*/, int cou
         }
 
         // если искомое слово найдено, то можно завершать цикл
-        if(out!="")
+        if(!out.isEmpty())
             break;
         --counter;
     }

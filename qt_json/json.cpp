@@ -22,7 +22,7 @@
 
 #include <QDateTime>
 #include "json.h"
-#include <QDebug>
+//#include <QDebug>
 
 namespace QtJson {
 
@@ -260,24 +260,31 @@ namespace QtJson {
      * parseObject
      */
     static QVariant parseObject(const QString &json, int &index, bool &success) {
+        //qDebug() << "JsonTokenCurlyOpen";
         QVariantMap map;
-        int token;
         // Get rid of the whitespace and increment index
-        nextToken(json, index);
-        if(index==1&&fileType=="lua") index = 0;
+        int token = nextToken(json, index);
+        //qDebug() << "next token" << token;
+
+        // это необходимо, так как сразу начинается объект
+        if(index==1&&fileType=="lua") index--;
 
         // Loop through all of the key/value pairs of the object
         bool done = false;
         while (!done) {
+            //qDebug() << "ne done";
             // Get the upcoming token
             token = lookAhead(json, index);
 
             if (token == JsonTokenNone) {
+                //qDebug() << "JsonTokenNone";
                 success = false;
                 return QVariantMap();
             } else if (token == JsonTokenComma) {
+                //qDebug() << "JsonTokenComma";
                 nextToken(json, index);
             } else if (token == JsonTokenCurlyClose) {
+                //qDebug() << "JsonTokenCurlyClose" << index;
                 nextToken(json, index);
                 if(index==json.size()-2&&fileType=="lua") index = json.size()-3;
                 return map;
@@ -300,13 +307,16 @@ namespace QtJson {
                 }
                 // Parse the key/value pair's value
                 QVariant value = parseValue(json, index, success);
+                //qDebug() << value;
                 if (!success) {
                     return QVariantMap();
                 }
+                //qDebug() << "success";
                 // Assign the value to the key in the map
                 map[name] = value;
             }
         }
+
         // Return the map successfully
         return QVariant(map);
     }
@@ -363,9 +373,9 @@ namespace QtJson {
             if (index == json.size()) {
                 break;
             }
-
             c = json[index++];
-            if (c == '\"'|| (fileType=="lua"&&c == ',')) {
+            if ((quoteOpen&&c == '\"')||
+                (fileType=="lua"&&c == ','&&!quoteOpen)){
                 complete = true;
                 break;
             } else if (c == '\\') {
@@ -419,6 +429,7 @@ namespace QtJson {
             success = false;
             return QVariant();
         }
+        //qDebug() << s;
         return QVariant(s);
     }
 
@@ -453,6 +464,7 @@ namespace QtJson {
                 qulonglong ull = numberStr.toULongLong(&ok);
                 return ok ? ull : QVariant(numberStr);
             }
+            //qDebug() << u;
             return u;
         }
     }
@@ -494,8 +506,9 @@ namespace QtJson {
      */
     static int nextToken(const QString &json, int &index) {
         eatWhitespace(json, index);
-
+        //qDebug() << "nextToken index" << index;
         if (index == json.size()) {
+            //qDebug() << "JsonTokenNone index" << index;
             return JsonTokenNone;
         }
 
@@ -508,7 +521,6 @@ namespace QtJson {
     //            case '[': return JsonTokenSquaredOpen;
     //            case ']': return JsonTokenSquaredClose;
                 case ',': return JsonTokenComma;
-                return JsonTokenString;
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
                 return JsonTokenNumber;

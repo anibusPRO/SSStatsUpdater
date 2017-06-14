@@ -10,7 +10,7 @@ QT       -= gui
 QMAKE_CXXFLAGS += -std=c++11
 
 CONFIG -= console
-
+DEFINES  += QT_NO_SSL
 TEMPLATE = app
 #TEMPLATE = lib
 #CONFIG += static
@@ -18,8 +18,10 @@ TEMPLATE = app
 
 TARGET = SSStats
 
-PROJECT_PATH = "C:/OpenServer/domains/dowstats/ssstats"
+PROJECT_PATH = "C:/OpenServer/domains/dowstats.loc/ssstats"
 DESTDIR      = $$PROJECT_PATH
+
+RC_FILE = stats.rc
 
 #static { # everything below takes effect with CONFIG ''= static
 # CONFIG += static
@@ -55,9 +57,11 @@ SOURCES += main.cpp \
         extendedbinreader.cpp \
         apmmeter.cpp \
         systemwin32.cpp \
-    OSDaB-Zip/unzip.cpp \
-    OSDaB-Zip/zip.cpp \
-    OSDaB-Zip/zipglobal.cpp
+        OSDaB-Zip/unzip.cpp \
+        OSDaB-Zip/zip.cpp \
+        OSDaB-Zip/zipglobal.cpp \
+        monitor.cpp \
+        APMMeasure.cpp
 
 
 HEADERS += request.h \
@@ -75,26 +79,25 @@ HEADERS += request.h \
         extendedbinreader.h \
         apmmeter.h \
         systemwin32.h \
-    vdf_parser.hpp \
-    OSDaB-Zip/unzip.h \
-    OSDaB-Zip/unzip_p.h \
-    OSDaB-Zip/zip.h \
-    OSDaB-Zip/zip_p.h \
-    OSDaB-Zip/zipentry_p.h \
-    OSDaB-Zip/zipglobal.h
+        vdf_parser.hpp \
+        OSDaB-Zip/unzip.h \
+        OSDaB-Zip/unzip_p.h \
+        OSDaB-Zip/zip.h \
+        OSDaB-Zip/zip_p.h \
+        OSDaB-Zip/zipentry_p.h \
+        OSDaB-Zip/zipglobal.h \
+        monitor.h \
+        APMMeasure.h \
+    version.h \
+    defines.h
 
 
-SOURCES += APMShared/APMConfig.cpp \
-    APMShared/APMLogger.cpp \
-    APMShared/APMMeasure.cpp \
-    APMShared/APMTrigger.cpp \
-    APMShared/ProcessResolver.cpp
+LIBS += -lpsapi
 
-HEADERS +=    APMShared/APMConfig.h \
-    APMShared/APMLogger.h \
-    APMShared/APMMeasure.h \
-    APMShared/APMTrigger.h \
-    APMShared/ProcessResolver.h
-
-include(qt_json/qt_json.pri)
+include(C:/Programming/SSStats/qt_json/qt_json.pri)
 #!contains(DEFINES, HAVE_QT5)
+
+win32 {
+    WINSDK_DIR = C:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
+    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/x64/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
+}

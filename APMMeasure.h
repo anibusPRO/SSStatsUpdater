@@ -2,7 +2,7 @@
 
 #include <windows.h>
 #include "..\APMKeyHook\APMKeyHook.h"
-#include "APMConfig.h"
+
 
 #define RING_SIZE 20
 #define MEASURE_CYCLE_LENGTH 500
@@ -24,6 +24,17 @@ typedef struct {
 } APMLoggableSnapshot;
 
 class APMMeasure {
+public:
+    APMMeasure();
+    ~APMMeasure();
+    void moveCurrentAPM();
+    long getAverageAPM();
+    long getCurrentAPM();
+    long getTime();
+    long getTotalActions();
+    void resetAllAPM();
+    APMLoggableSnapshot getSnapshot();
+
 private:
 	HANDLE hSharedMemory;
 	LPLONG lpSharedMemory;
@@ -42,17 +53,5 @@ private:
 	BOOL reset_pending;
 
 	static long computeAPM(long actions, DWORD starttick);
-
-
 	void setTotalActions(long n);
-public:
-	APMMeasure(APMConfig* n_cfg);
-	~APMMeasure();
-	void moveCurrentAPM();
-	long getAverageAPM();
-	long getCurrentAPM();
-    long getTime();
-    long getTotalActions();
-    void resetAllAPM();
-	APMLoggableSnapshot getSnapshot();
 };

@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <QDebug>
 
-APMMeasure::APMMeasure(APMConfig* n_cfg) {
-	reset_pending = n_cfg->skip_begin;
+APMMeasure::APMMeasure() {
+    reset_pending = TRUE;
 
 
 //    HANDLE CreateFileMapping(
@@ -14,22 +14,22 @@ APMMeasure::APMMeasure(APMConfig* n_cfg) {
 //      DWORD dwMaximumSizeHigh, // размер файла (старшее слово)
 //      DWORD dwMaximumSizeLow,  // размер файла (младшее слово)
 //      LPCTSTR lpName);         // имя отображенного файла
-
-	hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, SHARED_MEMORY_SIZE, SHARED_MEMORY_NAME);
-    lpSharedMemory = (LPLONG)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, SHARED_MEMORY_SIZE);
+    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(long), L"APMHook-Shared-Memory");
+    lpSharedMemory = (LPLONG)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
 
 	resetAllAPM();
 }
 
 APMMeasure::~APMMeasure() {
+    UnmapViewOfFile(lpSharedMemory);
 	CloseHandle(hSharedMemory);
 }
 
 long APMMeasure::getTotalActions() {
 //    LONG InterlockedExchange( PLONG plTarget, LONG IValue);
-//монопольно заменяen текущее значение переменной типа LONG,
+//монопольно заменят текущее значение переменной типа LONG,
 //адрес которой передается в первом параметре, на значение,
-//передаваемое во втором параметре
+//передаваемое во втором параметре, возвращает значение переменной до замены
 
 	total_actions += InterlockedExchange(lpSharedMemory, 0);
 
@@ -84,7 +84,10 @@ long APMMeasure::computeAPM(long actions, DWORD raw_span) {
 	double span = (double)(raw_span)/1000.0;
     // затем делим количество действий на вермя, получаем количествой действий
     // в секунду, умножаем на 60 и получаем количество действий в минуту
-	return (long)(((double)actions/span)*60);
+    if(span!=0)
+        return (long)(((double)actions/span)*60);
+    else
+        return 0;
 }
 
 // получить текущий APM

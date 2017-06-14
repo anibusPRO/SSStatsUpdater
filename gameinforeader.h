@@ -27,26 +27,26 @@ public:
     GameInfoReader();
     ~GameInfoReader();
 
+    void init(QString path, QString SID, QString name);
+    void reset();
     QString read_warnings_log(QString str, int offset=0, int count=1);
-    QString get_game_info(QString profile);
     QString get_cur_profile_dir();
-    QString get_steam_id() const;
+    QString find_profile();
     QString get_playback_name() const;
     QString get_last_invalid_map() const;
-    QStringList get_players(QString profile);
+    QString get_game_stats() const;
+    QStringList get_players();
     QByteArray get_playback_file();
     bool is_map_valid();
-    void setTotalActions(long n);
-    void set_ss_path(const QString &value);
-    void set_account(QString SID, QString name);
+    void get_error_debug(int e_code);
+    int read_game_info(QMap<QString, QString> *sids, long totalActions);
     int readySend();
 
-
+    QString cur_profile_folder;
 
 private:
-    int search_info(QString profile);
-    GameInfo *_game_info;
-    QString cur_profile_name;
+    int search_info(long totalActions);
+    QString game_stats;
     QString ss_path;
     QString playback_name;
     QString sender_steamID;

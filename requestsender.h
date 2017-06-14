@@ -3,16 +3,14 @@
 //#define NETWORK_SHOW_SEND_REQUESTS
 
 #include <QNetworkProxy>
-#include <QObject>
+#include <QSignalMapper>
+//#include <QStringListModel>
 #include <QUrl>
-
+#include "OSDaB-Zip/unzip.h"
 #include "request.h"
 
-class QNetworkAccessManager;
-class QNetworkReply;
-class QSslError;
 
-class RequestSender:public QObject
+class RequestSender : public QObject
 {
     Q_OBJECT
 public:
@@ -24,16 +22,16 @@ public:
         NetworkError
     };
 
-    RequestSender(qint64 maxWaitTime = 35000);
+    RequestSender(qint64 maxWaitTime = 35000, QObject * parent = nullptr);
     ~RequestSender();
 
     void setProxy(const QNetworkProxy& proxy);
-//    QByteArray *getFile();
+
     QByteArray get(Request& request);
     QByteArray post(Request& request);
     QByteArray getWhileSuccess(Request& request, int maxCount = 2);
     QByteArray postWhileSuccess(Request& request, int maxCount = 2);
-
+    bool decompress(const QString& file, const QString& out, const QString& pwd);
     void setMaxWaitTime(qint64 max);
     qint64 maxWaitTime() const;
     RequestError error() const;
@@ -44,25 +42,24 @@ private:
     qint64 _maxWaitTime;
     RequestError _error;
     QNetworkProxy _proxy;
-    QNetworkAccessManager* m_pnam;
-    QByteArray *file;
+    QNetworkAccessManager* m_manager;
+    QSignalMapper m_mapper;
 
 public slots:
-    void updateProgress(qint64 bytesSent, qint64 bytesTotal);
 //    void sslErrors(QNetworkReply* reply,const QList<QSslError> &errors);
-    void get(QString url);
-    void post(QString url,
+    void updateProgress(qint64 bytesSent, qint64 bytesTotal);
+    void GET_REQUEST(QString url, QString fileName);
+    void POST_REQUEST(QString url,
               QString name,
               QString content,
               QByteArray data);
 private slots:
     void slotFinished(QNetworkReply*);
+    void map(QNetworkReply* reply);
+    void onFeedRetrieved(const QString &fileName);
 
-signals:
-    void done(const QUrl&, const QByteArray&);
-    void downloadProgress(qint64,qint64);
-    void finished();
-//    void error();
+//signals:
+//    void downloadProgress(qint64,qint64);
 
 };
 
