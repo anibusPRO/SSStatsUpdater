@@ -21,7 +21,8 @@ public:
         SistersOfBattle,
         Tau,
         ImperialGuard
-    };
+    } ResolvedRace;
+
     enum PlayerTypeEnum
     {
         EmptySlot = 0,
@@ -31,29 +32,21 @@ public:
         OtherPlayer
     };
 
-
-    short ActionCount;
-
-    int LastActionTick;
-
-    int Type;
-
     QString Name;
-
-    int Team;
-
     QString Race;
-
-
-    RaceEnum ResolvedRace;
+    uint Type;
+    uint Team;
+    ushort ActionCount;
+    uint LastActionTick;
 
     QString Bytes;
-    char Temp;
-    int getResolvedType() const;
-    QString getResolvedTypeStr() const;
-    int getResolvedRace() const;
+    ulong LenghtFOLDGPLY;
+
     QString getShortRaceName() const;
     QString getVeryShortRaceName() const;
+    QString getResolvedTypeStr() const;
+    int getResolvedRace() const;
+    int getResolvedType() const;
     bool isEmpty() const;
     bool isSpectator() const;
 };

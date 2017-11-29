@@ -5,7 +5,7 @@
 ExtendedBinReader::ExtendedBinReader(QIODevice *parent)
     : QDataStream(parent)
 {
-
+    this->setByteOrder(QDataStream::LittleEndian);
 }
 
 ExtendedBinReader::~ExtendedBinReader()
@@ -13,131 +13,59 @@ ExtendedBinReader::~ExtendedBinReader()
 
 }
 
+bool ExtendedBinReader::seek(qint64 pos)
+{
+    return device()->seek(pos);
+}
+
+qint64 ExtendedBinReader::pos()
+{
+    return device()->pos();
+}
+
 qint16 ExtendedBinReader::ReadInt16()
 {
-    QByteArray buffer;
-    int count=2;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-    delete[] temp;
-    return (qint16)(((quint8)buffer[0]&0xFF) | ((quint8)buffer[1] << 8));
+    qint16 temp;
+    *this >> temp;
+    return temp;
 }
 
 qint32 ExtendedBinReader::ReadInt32()
 {
-    QByteArray buffer;
-    int count=4;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-    delete[] temp;
-    return (int)(((quint8)buffer[0]&0xFF) | ((quint8)buffer[1]<<8) | ((quint8)buffer[2]<<16) | ((quint8)buffer[3]<<24));
-}
-
-qint64 ExtendedBinReader::ReadInt64()
-{
-    QByteArray buffer;
-    int count=8;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-
-    uint lo = (uint)((quint8)buffer[0] | ((quint8)buffer[1]) << 8 |
-                     ((quint8)buffer[2]) << 16 | (quint8)buffer[3] << 24);
-
-    uint hi = (uint)((quint8)buffer[4] | ((quint8)buffer[5]) << 8 |
-                     ((quint8)buffer[6]) << 16 | (quint8)buffer[7] << 24);
-    delete[] temp;
-    return (long) ((ulong)hi) << 32 | lo;
+    qint32 temp;
+    *this >> temp;
+    return temp;
 }
 
 char ExtendedBinReader::ReadChar()
 {
-    QByteArray buffer;
-    int count=1;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-    delete[] temp;
-    return (char)buffer[0];
+    char temp;
+    readRawData(&temp, 1);
+    return temp;
 }
 
-quint8 ExtendedBinReader::ReadByte()
+QString ExtendedBinReader::ReadStringUTF8(int count)
 {
-    QByteArray buffer;
-    int count=1;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-    delete[] temp;
-    return (quint8)buffer[0];
+    char temp[count+1]={0};
+    readRawData(temp, count);
+    return QString::fromUtf8(temp);
 }
-
-
-
-void ExtendedBinReader::ReadInt32Array(int *ar, int count)
+QString ExtendedBinReader::ReadStringUTF16(int count)
 {
-    for (int i = 0; i < count; i++)
-    {
-        QByteArray buffer;
-
-        int n=4;
-        char *temp = new char[n];
-        this->readRawData(temp, n);
-
-        buffer.append(temp, n);
-
-        delete [] temp;
-        ar[i] = (int)(((quint8)buffer[0]&0xFF) | ((quint8)buffer.at(1)<<8) | ((quint8)buffer[2]<<16) | ((quint8)buffer[3]<<24));
-    }
-}
-
-void ExtendedBinReader::ReadInt16Array(qint16* ar, int counter)
-{
-    for (int i = 0; i < counter; i++)
-    {
-        QByteArray buffer;
-        int count=2;
-        char *temp = new char[count];
-        this->readRawData(temp, count);
-        buffer.append(temp, count);
-        delete[] temp;
-        ar[i] = (short)((quint8)(buffer[0] & 0xFF) | (quint8)buffer[1] << 8);
-    }
-}
-
-QString ExtendedBinReader::ReadChars(int count)
-{
-    QByteArray buffer;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-    delete[] temp;
-    return QString(buffer.data());
-}
-// читает массив char и возвращает указатель на него
-void ExtendedBinReader::ReadBytes(char *array, int count)
-{
-    this->readRawData(array, count);
-}
-// читает массив байт размером count из бинарного файла и возвращает его
-QByteArray ExtendedBinReader::ReadBytesArray(int count)
-{
-    QByteArray buffer;
-    char *temp = new char[count];
-    this->readRawData(temp, count);
-    buffer.append(temp, count);
-    delete[] temp;
-    return buffer;
+    char temp[count*2+2]={0};
+    readRawData(temp, count*2);
+    return QString::fromUtf16((ushort*)temp);
 }
 
 void ExtendedBinReader::WriteInt32(int num)
 {
-    QByteArray ar;
-    QDataStream stream(&ar, QIODevice::WriteOnly);
-    stream.setByteOrder(QDataStream::LittleEndian);
-    stream << num;
-    this->device()->write(ar);
+    *this << num;
 }
 
+// читает массив байт размером count из бинарного файла и возвращает его
+QByteArray ExtendedBinReader::ReadBytesArray(int count)
+{
+    char temp[count] = {0};
+    readRawData(temp, count);
+    return QByteArray(temp);
+}

@@ -8,7 +8,7 @@
 #define VER_PRODUCTVERSION          1,0,5
 #define VER_PRODUCTVERSION_STR      "1.0.5\0"
 
-#define VER_COMPANYNAME_STR         "Russian Soulstorm Community"
+#define VER_COMPANYNAME_STR         "Soulstorm Ladder Company"
 #define VER_FILEDESCRIPTION_STR     "Soulstorm Ladder"
 #define VER_INTERNALNAME_STR        ""
 #define VER_LEGALCOPYRIGHT_STR      "Copyright 2017 Lebedko Oleg loa92@mail.ru"

@@ -1,16 +1,20 @@
-#-------------------------------------------------
-#
-# Project created by QtCreator 2016-09-23T16:34:40
-#
-#-------------------------------------------------
-
-QT       += core network
-QT       -= gui
+QT       += core gui network
+CONFIG += console
+CONFIG += debug
+#CONFIG += qxt
+#QXT += core gui
 
 QMAKE_CXXFLAGS += -std=c++11
 
-CONFIG -= console
-DEFINES  += QT_NO_SSL
+#QMAKE_EXTRA_TARGETS += before_build makefilehook
+#makefilehook.target = $(MAKEFILE)
+#makefilehook.depends = .beforebuild
+#PRE_TARGETDEPS += .beforebuild
+#before_build.target = .beforebuild
+#before_build.depends = FORCE
+#before_build.commands = chcp 65001
+
+#DEFINES  += QT_NO_SSL
 TEMPLATE = app
 #TEMPLATE = lib
 #CONFIG += static
@@ -19,27 +23,10 @@ TEMPLATE = app
 TARGET = SSStats
 
 PROJECT_PATH = "C:/OpenServer/domains/dowstats.loc/ssstats"
-DESTDIR      = $$PROJECT_PATH
+#DESTDIR      = $$PROJECT_PATH
 
-RC_FILE = stats.rc
-
-#static { # everything below takes effect with CONFIG ''= static
-# CONFIG += static
-# CONFIG += staticlib # this is needed if you create a static library, not a static executable
-# DEFINES+= STATIC
-# message("~~~ static build ~~~") # this is for information, that the static build is done
-# mac: TARGET = $$join(TARGET,,,_static) #this adds an _static in the end, so you can seperate static build from non static build
-# win32: TARGET = $$join(TARGET,,,s) #this adds an s in the end, so you can seperate static build from non static build
-#}
-
-#CONFIG (debug, debug|release) {
-# mac: TARGET = $$join(TARGET,,,_debug)
-# win32: TARGET = $$join(TARGET,,,d)
-#}
-
+RC_FILE = ssstats.rc
 INCLUDEPATH += C:/boost/include/boost-1_63
-
-DEFINES += SSSTATS_LIBRARY
 
 SOURCES += main.cpp \
         request.cpp \
@@ -49,9 +36,7 @@ SOURCES += main.cpp \
         statscollector.cpp \
         logger.cpp \
         replay.cpp \
-        game_action.cpp \
         player.cpp \
-        winconditions.cpp \
         gamesettings.cpp \
         repreader.cpp \
         extendedbinreader.cpp \
@@ -60,8 +45,9 @@ SOURCES += main.cpp \
         OSDaB-Zip/unzip.cpp \
         OSDaB-Zip/zip.cpp \
         OSDaB-Zip/zipglobal.cpp \
-        monitor.cpp \
-        APMMeasure.cpp
+        APMMeasure.cpp \
+    qtxglobalshortcut/qxtglobalshortcut.cpp \
+    qtxglobalshortcut/qxtglobalshortcut_win.cpp
 
 
 HEADERS += request.h \
@@ -73,7 +59,6 @@ HEADERS += request.h \
         replay.h \
         game_action.h \
         player.h \
-        winconditions.h \
         gamesettings.h \
         repreader.h \
         extendedbinreader.h \
@@ -86,16 +71,17 @@ HEADERS += request.h \
         OSDaB-Zip/zip_p.h \
         OSDaB-Zip/zipentry_p.h \
         OSDaB-Zip/zipglobal.h \
-        monitor.h \
         APMMeasure.h \
-    version.h \
-    defines.h
+        version.h \
+        defines.h \
+    qtxglobalshortcut/qxtglobal.h \
+    qtxglobalshortcut/qxtglobalshortcut.h \
+    qtxglobalshortcut/qxtglobalshortcut_p.h
 
 
 LIBS += -lpsapi
 
 include(C:/Programming/SSStats/qt_json/qt_json.pri)
-#!contains(DEFINES, HAVE_QT5)
 
 win32 {
     WINSDK_DIR = C:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A

@@ -91,10 +91,12 @@ namespace tyti
             {
                 static const char* result(const char* c, const wchar_t* wc)
                 {
+                    (void)wc;
                     return c;
                 }
                 static const char result(char c, wchar_t wc)
                 {
+                    (void)wc;
                     return c;
                 }
             };
@@ -104,10 +106,12 @@ namespace tyti
             {
                 static const wchar_t* result(const char* c, const wchar_t* wc)
                 {
+                    (void)c;
                     return wc;
                 }
                 static const wchar_t result(char c, wchar_t wc)
                 {
+                    (void)c;
                     return wc;
                 }
             };

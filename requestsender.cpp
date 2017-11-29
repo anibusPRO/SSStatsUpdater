@@ -18,8 +18,6 @@ RequestSender::RequestSender(qint64 maxWaitTime /*= 35000*/, QObject *parent) : 
     setMaxWaitTime(maxWaitTime);
     _error = NoError;
     m_manager = new QNetworkAccessManager(this);
-//    connect(m_manager, SIGNAL(finished(QNetworkReply*)),
-//    this, SLOT(slotFinished(QNetworkReply*)));
     connect(m_manager, SIGNAL(finished(QNetworkReply*)), SLOT(map(QNetworkReply*)));
     connect(&m_mapper, SIGNAL(mapped(QString)), SLOT(onFeedRetrieved(QString)));
 
@@ -27,54 +25,58 @@ RequestSender::RequestSender(qint64 maxWaitTime /*= 35000*/, QObject *parent) : 
 
 void RequestSender::onFeedRetrieved(const QString &fileName)
 {
-//   qDebug() << "onFeedRetrieved" << QThread::currentThreadId() << fileName;
-   auto *pnr = qobject_cast<QNetworkReply*>(m_mapper.mapping(fileName));
+    auto *pnr = qobject_cast<QNetworkReply*>(m_mapper.mapping(fileName));
 
-   QVariant redirectionTarget = pnr->attribute(QNetworkRequest::RedirectionTargetAttribute);
-   if (pnr->error() != QNetworkReply::NoError){
-       qDebug() << pnr->error()
-                << pnr->errorString()
-                << pnr->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                << pnr->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()
-                << pnr->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
-   }
-   else if (!redirectionTarget.isNull()) {
-       QUrl newUrl = pnr->url().resolved(redirectionTarget.toUrl());
-       QNetworkAccessManager *manager = pnr->manager();
-       QNetworkRequest redirection(newUrl);
-       QNetworkReply *newReply = manager->get(redirection);
-       m_mapper.setMapping(newReply, fileName);
-       pnr->deleteLater();
-       return;
-   }
-   else if(!fileName.isEmpty()){
-       qDebug() << "Downloading" << fileName << pnr->header(QNetworkRequest::ContentLengthHeader).toInt();
-       QByteArray btar = pnr->readAll();
-       if(!btar.isEmpty())
-       {
-           QFile cur_file(fileName);
-           if(cur_file.open(QIODevice::WriteOnly)){
-               cur_file.write(btar);
-               cur_file.close();
-               qDebug() << fileName << "downloaded successfully";
-               if(fileName.section(".",1,1)=="zip"&&decompress(cur_file.fileName(),QFileInfo(fileName).absolutePath(),""))
-               {
-                   qDebug() << fileName << "unpacked successfully";
-                   QFile::remove(fileName);
-               }
-           }
-           else
-               qDebug() << "Could not open" << fileName;
-       }
-       else
-           qDebug() << "Reply is empty";
-   }
-   else
-   {
-       QString reply = QString::fromUtf8(pnr->readAll().data());
-       if(!reply.isEmpty())
-           qDebug() << reply.remove("<br>");
-   }
+    QVariant redirectionTarget = pnr->attribute(QNetworkRequest::RedirectionTargetAttribute);
+    if (pnr->error() != QNetworkReply::NoError){
+        qDebug() << pnr->error()
+                 << pnr->errorString()
+                 << pnr->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                 << pnr->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();
+    }else if (!redirectionTarget.isNull()) {
+        QUrl newUrl = pnr->url().resolved(redirectionTarget.toUrl());
+        qDebug() << "Redirection to:" << newUrl.toString();
+        QNetworkAccessManager *manager = pnr->manager();
+        QNetworkRequest redirection(newUrl);
+        QNetworkReply *newReply = manager->get(redirection);
+        m_mapper.setMapping(newReply, fileName);
+        pnr->deleteLater();
+        return;
+    }else if(fileName.contains("stats")){
+        qDebug() << "Reply from server on stats:";
+        QByteArray replyQBAR = pnr->readAll();
+        emit send_reply(replyQBAR);
+        QString reply = QString::fromUtf8(replyQBAR);
+        qDebug() << reply.replace("<br>", "\n");
+    }else if(fileName=="logs"){
+    }else if(!fileName.isEmpty()){
+        qDebug() << "Downloading" << fileName << pnr->header(QNetworkRequest::ContentLengthHeader).toInt();
+        QByteArray btar = pnr->readAll();
+        if(!btar.isEmpty())
+        {
+            QFile cur_file(fileName);
+            if(cur_file.open(QIODevice::WriteOnly)){
+                cur_file.write(btar);
+                cur_file.close();
+                qDebug() << fileName << "downloaded successfully";
+                if(fileName.section(".",1,1)=="zip"&&decompress(cur_file.fileName(),QFileInfo(fileName).absolutePath(),""))
+                {
+                    qDebug() << fileName << "unpacked successfully";
+                    QFile::remove(fileName);
+                }
+            }
+            else
+                qDebug() << "Could not open" << fileName;
+        }
+        else
+            qDebug() << "Reply is empty";
+    }else{
+        QByteArray replyQBAR = pnr->readAll();
+        emit send_reply(replyQBAR);
+        QString str_reply = QString::fromUtf8(replyQBAR.data());
+        int statusCode = pnr->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        qDebug() << statusCode << str_reply.replace("<br>", "\n");
+    }
 }
 
 RequestSender::~RequestSender()
@@ -91,6 +93,13 @@ QByteArray RequestSender::get(Request& request)
 {
     return sendRequest(request, true);
 }
+
+QByteArray RequestSender::get(QString url)
+{
+    Request request(url);
+    return sendRequest(request, true);
+}
+
 
 QByteArray RequestSender::post(Request& request)
 {
@@ -124,9 +133,6 @@ RequestSender::RequestError RequestSender::error() const
 
 QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true*/)
 {
-//    QTimer timer;
-//    timer.setInterval(_maxWaitTime);
-//    timer.setSingleShot(true);
 
     QEventLoop loop;
     QSharedPointer<QNetworkAccessManager> manager(new QNetworkAccessManager);
@@ -138,42 +144,35 @@ QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true
     QNetworkReply* reply = getRequest ?
                     manager->get(req) :
                     manager->post(req, request.data(getRequest));
+//    reply->ignoreSslErrors();
 
-    reply->ignoreSslErrors();
-
-    QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
-
-//    if (getRequest)
-//    {
-//        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), &timer, SLOT(start()));
-//        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
-//        QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updateProgress(qint64,qint64)));
-//    }
-//    else
-//        QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), &timer, SLOT(start()));
-
-//    QObject::connect(&timer, SIGNAL(timeout()), reply, SIGNAL(finished()));
-
-//    timer.start();
+    QTimer timout;
+    timout.setSingleShot(true);
+    connect(&timout, SIGNAL(timeout()), &loop, SLOT(quit()));
+    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+    timout.start(_maxWaitTime);
     loop.exec();
 
     QByteArray data;
     if (reply->isFinished())
     {
+        timout.stop();
         int network_error = reply->error();
-        if(network_error==QNetworkReply::NoError&&reply->isReadable()){
+        if(reply->error()==QNetworkReply::NoError&&reply->isReadable()){
             _error = NoError;
             data = reply->readAll();
         }
         else{
             _error = NetworkError;
-            qDebug() << "\n Network Error:"
-                     << network_error << "\n"
-                     << reply->errorString() << "\n"
+            qDebug() << network_error
+                     << reply->errorString()
                      << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                     << reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()
-                     << reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+                     << reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();
         }
+    }
+    else{
+        reply->abort();
+        _error = TimeoutError;
     }
     reply->deleteLater();
 
@@ -214,14 +213,17 @@ void RequestSender::GET_REQUEST(QString url, QString fileName)
     req.setRawHeader("User-Agent", "SSStats");
 
     auto reply = m_manager->get(req);
+
+    connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
+
     // Ensure a unique mapping
-//    Q_ASSERT(m_mapper.mapping(dataModel) == nullptr);
+//    Q_ASSERT(m_mapper.mapping(fileName) == nullptr);
 
 //    qDebug() << "setMapping" << reply << fileName;
     m_mapper.setMapping(reply, fileName);
 }
 
-void RequestSender::POST_REQUEST(QString url, QString name, QString content, QByteArray data)
+void RequestSender::POST_REQUEST(QString url, QString name, QString content, QByteArray data, QString mapping)
 {
     Request request;
     request.setAddress(url);
@@ -229,7 +231,8 @@ void RequestSender::POST_REQUEST(QString url, QString name, QString content, QBy
     QNetworkRequest req = request.request(false);
     req.setRawHeader("User-Agent", "SSStats");
 
-    m_manager->post(req, request.data(false));
+    auto reply = m_manager->post(req, request.data(false));
+    m_mapper.setMapping(reply, mapping);
 }
 
 void RequestSender::slotFinished(QNetworkReply* pnr)
@@ -293,63 +296,35 @@ bool RequestSender::decompress(const QString& file, const QString& out, const QS
     return true;
 }
 
-//#ifndef QT_NO_SSL
-//void RequestSender::sslErrors(QNetworkReply* reply, const QList<QSslError> &errors)
-//{
-//    foreach (const QSslError &error, errors) {
-//        qDebug() << error.errorString();
-//    }
+bool RequestSender::compress(const QString& zip, const QString& dir, const QString& pwd)
+{
+    QFileInfo fi(dir);
+    if (!fi.isDir()) {
+        qDebug() << "Directory does not exist.";
+        return false;
+    }
 
-//    reply->ignoreSslErrors();
-//}
-//#endif
+    Zip::ErrorCode ec;
+    Zip uz;
 
-//void HttpWindow::httpFinished()
-//{
-//    if (httpRequestAborted) {
-//        if (file) {
-//            file->close();
-//            file->remove();
-//            delete file;
-//            file = 0;
-//        }
-//        reply->deleteLater();
-//        progressDialog->hide();
-//        return;
-//    }
+    ec = uz.createArchive(zip);
+    if (ec != Zip::Ok) {
+        qDebug() << "Unable to create archive: " << uz.formatError(ec).toLatin1().data();
+        return false;
+    }
 
-//    progressDialog->hide();
-//    file->flush();
-//    file->close();
+    uz.setPassword(pwd);
+    ec = uz.addDirectoryContents(dir);
+    if (ec != Zip::Ok) {
+        qDebug() << "Unable to add directory: " << uz.formatError(ec).toLatin1().data();
+    }
 
-//    QVariant redirectionTarget = reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
-//    if (reply->error()) {
-//        file->remove();
-//        QMessageBox::information(this, tr("HTTP"),
-//                                 tr("Download failed: %1.")
-//                                 .arg(reply->errorString()));
-//        downloadButton->setEnabled(true);
-//    } else if (!redirectionTarget.isNull()) {
-//        QUrl newUrl = url.resolved(redirectionTarget.toUrl());
-//        if (QMessageBox::question(this, tr("HTTP"),
-//                                  tr("Redirect to %1 ?").arg(newUrl.toString()),
-//                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-//            url = newUrl;
-//            reply->deleteLater();
-//            file->open(QIODevice::WriteOnly);
-//            file->resize(0);
-//            startRequest(url);
-//            return;
-//        }
-//    } else {
-//        QString fileName = QFileInfo(QUrl(urlLineEdit->text()).path()).fileName();
-//        statusLabel->setText(tr("Downloaded %1 to %2.").arg(fileName).arg(QDir::currentPath()));
-//        downloadButton->setEnabled(true);
-//    }
+    uz.setArchiveComment("This archive has been created using OSDaB Zip (http://osdab.42cows.org/).");
 
-//    reply->deleteLater();
-//    reply = 0;
-//    delete file;
-//    file = 0;
-//}
+    if (uz.closeArchive() != Zip::Ok) {
+        qDebug() << "Unable to close the archive: " << uz.formatError(ec).toLatin1().data();
+    }
+
+    return ec == Zip::Ok;
+}
 

@@ -7,6 +7,7 @@
 //#include <QStringListModel>
 #include <QUrl>
 #include "OSDaB-Zip/unzip.h"
+#include "OSDaB-Zip/zip.h"
 #include "request.h"
 
 
@@ -27,11 +28,13 @@ public:
 
     void setProxy(const QNetworkProxy& proxy);
 
+    QByteArray get(QString url);
     QByteArray get(Request& request);
     QByteArray post(Request& request);
     QByteArray getWhileSuccess(Request& request, int maxCount = 2);
     QByteArray postWhileSuccess(Request& request, int maxCount = 2);
-    bool decompress(const QString& file, const QString& out, const QString& pwd);
+    static bool compress(const QString& zip, const QString& dir, const QString& pwd);
+    static bool decompress(const QString& file, const QString& out, const QString& pwd);
     void setMaxWaitTime(qint64 max);
     qint64 maxWaitTime() const;
     RequestError error() const;
@@ -46,21 +49,21 @@ private:
     QSignalMapper m_mapper;
 
 public slots:
-//    void sslErrors(QNetworkReply* reply,const QList<QSslError> &errors);
     void updateProgress(qint64 bytesSent, qint64 bytesTotal);
     void GET_REQUEST(QString url, QString fileName);
     void POST_REQUEST(QString url,
               QString name,
               QString content,
-              QByteArray data);
+              QByteArray data,
+              QString mapping);
 private slots:
     void slotFinished(QNetworkReply*);
     void map(QNetworkReply* reply);
     void onFeedRetrieved(const QString &fileName);
 
-//signals:
-//    void downloadProgress(qint64,qint64);
-
+signals:
+    void send_reply(QByteArray);
+    void downloadProgress(qint64,qint64);
 };
 
 #endif // REQUESTSENDER_H

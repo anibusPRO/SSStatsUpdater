@@ -22,7 +22,7 @@
 
 #include <QDateTime>
 #include "json.h"
-//#include <QDebug>
+#include <QDebug>
 
 namespace QtJson {
 
@@ -326,7 +326,6 @@ namespace QtJson {
      */
     static QVariant parseArray(const QString &json, int &index, bool &success) {
         QVariantList list;
-
         nextToken(json, index);
 
         bool done = false;
@@ -360,28 +359,41 @@ namespace QtJson {
         QString s;
         QChar c;
         eatWhitespace(json, index);
-
+//        qDebug() << parseString;
 
         c = json[index++];
-        if(c!='"'&&fileType=="lua") s.append(c);
 
         bool complete = false;
         bool quoteOpen = false;
+        bool squaredOpen = false;
         if(c=='"')
             quoteOpen = true;
+        else if(c=='['&&fileType=="lua"){
+            if(json[index++]=='[')
+                squaredOpen = true;
+            else index--;
+        } else
+            s.append(c);
         while(!complete) {
             if (index == json.size()) {
                 break;
             }
             c = json[index++];
-            if ((quoteOpen&&c == '\"')||
-                (fileType=="lua"&&c == ','&&!quoteOpen)){
+            if (quoteOpen&&c == '\"'){
+                if(squaredOpen)
+                    s.append(c);
+                else{
+                    complete = true;
+                    break;
+                }
+            } else if (fileType=="lua"&&c == ']'&&squaredOpen){
+                if(json[index++]!=']')
+                    index--;
                 complete = true;
                 break;
             } else if (c == '\\') {
-                if (index == json.size()) {
+                if (index == json.size())
                     break;
-                }
 
                 c = json[index++];
 
@@ -414,22 +426,25 @@ namespace QtJson {
                     } else {
                         break;
                     }
+                } else {
+                    s.append('\\');
+                    s.append(c);
                 }
-            } else
-                if(json[index] == '=' && fileType=="lua" && !quoteOpen){
+            } else if(json[index] == '=' && fileType=="lua" && !quoteOpen){
+                if(squaredOpen)
+                    s.append(c);
+                else{
                     complete = true;
                     break;
                 }
-                else
-                {
-                    s.append(c);
-                }
+            } else
+                s.append(c);
         }
         if (!complete) {
             success = false;
             return QVariant();
         }
-        //qDebug() << s;
+//        qDebug() << s;
         return QVariant(s);
     }
 
@@ -518,8 +533,8 @@ namespace QtJson {
             switch(c.toLatin1()) {
                 case '{': return JsonTokenCurlyOpen;
                 case '}': return JsonTokenCurlyClose;
-    //            case '[': return JsonTokenSquaredOpen;
-    //            case ']': return JsonTokenSquaredClose;
+//                case '[': return JsonTokenSquaredOpen;
+//                case ']': return JsonTokenSquaredClose;
                 case ',': return JsonTokenComma;
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':

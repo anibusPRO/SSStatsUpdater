@@ -15,11 +15,6 @@
 #include "vdf_parser.hpp"
 #include "OSDaB-Zip/unzip.h"
 #include <QUrl>
-//#include <QAbstractEventDispatcher>
-//#include <QtDebug>
-//#include <QVector>
-//#include <qt_windows.h>
-
 
 using namespace tyti;
 
@@ -39,7 +34,7 @@ StatsCollector::StatsCollector(QObject *parent) :
     curHP = false;
     log.installLog("stats.log");
     server_addr = "http://www.dowstats.h1n.ru";
-    cur_time = QDateTime::currentDateTime();
+
     reader = new GameInfoReader();
     lpSharedMemory = nullptr;
     hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
@@ -57,9 +52,6 @@ StatsCollector::StatsCollector(QObject *parent) :
         lpSharedMemory->CurrentAPM = 0;
         lpSharedMemory->AverageAPM = 0;
         lpSharedMemory->MaxAPM = 0;
-        lpSharedMemory->showMenu = false;
-        lpSharedMemory->showRaces = false;
-        lpSharedMemory->showAPM = false;
     }
     else
         qDebug() << "MapViewOfFile: Error" << GetLastError();
@@ -83,97 +75,83 @@ bool StatsCollector::start()
     // получаем из файла конфигураций данные о размере буфера
     version = settings.value("info/version", "0.0.0").toString().remove(".");
     server_addr = settings.value("info/serverAddr", "http://www.dowstats.h1n.ru/").toString();
-    qDebug() << "Server:" << server_addr << "Version:" << version;
     enableStats = settings.value("settings/enableStats", true).toBool();
-//    closeWithGame = settings.value("settings/closeWithGame", false).toBool();
     enableDXHook = false;
     if(lpSharedMemory){
         lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
-        if(enableDXHook){
-            lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
-            lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
-            lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
-            lpSharedMemory->version = version.toInt();
-        }
+        lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
+        lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
+        lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
+        lpSharedMemory->version = version.toInt();
     }
-    if(!enableStats) qDebug() << "STATS DISABLED";
-    if(enableDXHook){
-        qDebug() << "Creating shortcuts";
-        QString showMenuHK = settings.value("hotkeys/showMenuHK", "Ctrl+Shift+M").toString();
-        QString showRaceHK = settings.value("hotkeys/showRaceHK", "Ctrl+Shift+R").toString();
-        QString showAPMHK  = settings.value("hotkeys/showAPMHK", "Ctrl+Shift+A").toString();
 
+    QString showMenuHK = settings.value("hotkeys/showMenuHK", "Ctrl+Shift+M").toString();
+    QString showRaceHK = settings.value("hotkeys/showRaceHK", "Ctrl+Shift+R").toString();
+    QString showAPMHK  = settings.value("hotkeys/showAPMHK", "Ctrl+Shift+A").toString();
+
+    qDebug() << "creating shortcut";
+    if(enableDXHook){
         QxtGlobalShortcut* menuShortcut = new QxtGlobalShortcut(QKeySequence(showMenuHK), this);
         connect(menuShortcut, SIGNAL(activated()), this, SLOT(toggleMenuVisibility()));
         QxtGlobalShortcut* racesShortcut = new QxtGlobalShortcut(QKeySequence(showRaceHK), this);
         connect(racesShortcut, SIGNAL(activated()), this, SLOT(toggleRacesVisibility()));
         QxtGlobalShortcut* apmShortcut = new QxtGlobalShortcut(QKeySequence(showAPMHK), this);
         connect(apmShortcut, SIGNAL(activated()), this, SLOT(toggleAPMVisibility()));
-    } else qDebug() << "DXHOOK DISABLED";
 
-    int exitCode = QProcess::execute("ping", {"-n", "1", "8.8.8.8"});
+    }
+    int exitCode = QProcess::execute("ping", QStringList() << "-n" << "1" << "www.google.com");
     while(exitCode!=0)
     {
         qDebug() << "No internet connection available";
         Sleep(5000);
-        QCoreApplication::processEvents();
-        exitCode = QProcess::execute("ping", {"-n", "1", "8.8.8.8"});
+        qApp->processEvents();
+        exitCode = QProcess::execute("ping", QStringList() << "-n" << "1" << "www.google.com");
     }
-//    QString global_version = QString::fromUtf8(sender->get(server_addr+"/update.php?key="+QLatin1String(SERVER_KEY)+"&").data());
-//    global_version = global_version.remove('\n').remove('\r');
-//    qDebug() << "global version:" << global_version;
+    QString global_version = QString::fromUtf8(sender->get(server_addr+"/update.php?key="+QLatin1String(SERVER_KEY)+"&").data());
+    global_version = global_version.remove('\n').remove('\r');
+    qDebug() << "server address:" << server_addr;
+    qDebug() << "local version:" << version;
+    qDebug() << "global version:" << global_version;
 
+    QProcess updater_proc;
+    if(updater_proc.startDetached("SSStatsUpdater.exe"))
+    {
+        qDebug() << "SSStatsUpdater started successfully";
+        if(version.toInt()<global_version.toInt())
+            return false;
+    }
+    else
+        qDebug() << "SSStatsUpdater failed to start";
 
-//    if(version.toInt()<global_version.toInt()){
-//        QProcess updater_proc;
-//        if(updater_proc.startDetached("SSStatsUpdater.exe"))
-//        {
-//            qDebug() << "SSStatsUpdater started successfully";
-//            return false;
-//        }
-//        else
-//            qDebug() << "SSStatsUpdater failed to start";
-//    }
-
-    if(init_player())
-        qDebug() << "Player initialization successfull";
-    else{
+    qDebug() << "Player initialization";
+    if(!init_player())
+    {
         qDebug() << "Player initialization failed";
         return false;
     }
 
     ss_path = get_soulstorm_installlocation();
-    qDebug() << "Soulstorm:" << ss_path+"\\Soulstorm.exe";
     reader->init(ss_path, sender_steamID, sender_name);
 
     apm_thread = new QThread;
     apm_meter.moveToThread(apm_thread);
 
-    connect(apm_thread, SIGNAL(finished()), apm_thread, SLOT(deleteLater()));
-    connect(this, SIGNAL(start_apm_meter()), &apm_meter, SLOT(start()));
-    connect(&stats_timer, SIGNAL(timeout()), this, SLOT(check_game()));
+    QObject::connect(apm_thread, SIGNAL(finished()), apm_thread, SLOT(deleteLater()));
+    QObject::connect(this, SIGNAL(start_apm_meter()), &apm_meter, SLOT(start()));
 
     apm_thread->start();
-    stats_timer.start(5000);
 
+    qDebug() << "start";
+    cur_time = QDateTime::currentDateTime();
+    if(!enableStats) qDebug() << "STATS DISABLED";
+    if(!enableDXHook) qDebug() << "DXHOOK DISABLED" << enableDXHook << lpSharedMemory;
+    connect(&stats_timer, SIGNAL(timeout()), this, SLOT(check_game()));
+
+    // отправим лог файлы
     send_logfiles();
 
+    stats_timer.start(5000);
     return true;
-}
-
-QString StatsCollector::GetRandomString() const
-{
-   const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-   const int randomStringLength = 12; // assuming you want random strings of 12 characters
-
-   QString randomString;
-   for(int i=0; i<randomStringLength; ++i)
-   {
-       int index = qrand() % possibleCharacters.length();
-       QChar nextChar = possibleCharacters.at(index);
-       randomString.append(nextChar);
-   }
-   return randomString;
 }
 
 void StatsCollector::check_game()
@@ -183,11 +161,10 @@ void StatsCollector::check_game()
     // если время последнего изменения файла больше предыдущего
     // то это либо начало игры, либо конец, что необходимо обработать
     if(last_modified>cur_time){
-        QTimer showRacesTimer;
         bool procIsActive = true, isObserver = false;
         int e_code = 0;
         cur_time = QDateTime::currentDateTime();
-        int game_state = reader->readySend(true);
+        int game_state = reader->readySend();
         switch (game_state){
             // игра завершилась и она не реплей
             case 0:
@@ -207,11 +184,11 @@ void StatsCollector::check_game()
                                       reader->get_playback_name(),
                                       "application/octet-stream",
                                       reader->get_playback_file(),
-                                      "stats"+GetRandomString());
+                                      "stats");
                     }
                     else{
                         qDebug() << "send stats without replay";
-                        emit GET_REQUEST(url, "stats"+GetRandomString());
+                        emit GET_REQUEST(url);
                     }
                 }
                 else
@@ -235,7 +212,7 @@ void StatsCollector::check_game()
                                 qDebug() << players.at(i);
                                 memcpy(&lpSharedMemory->players[i][0], players.at(i).toStdString().data(), 100);
                             }
-
+                            QTimer showRacesTimer;
                             showRacesTimer.setSingleShot(true);
                             showRacesTimer.start(25000);
                             connect(&showRacesTimer, SIGNAL(timeout()), this, SLOT(toggleRacesVisibility()));
@@ -253,7 +230,7 @@ void StatsCollector::check_game()
                 // если игра идет и счетчик apm не запущен, то запустим его
                 if(!isObserver&&apm_meter.stopped)
                     emit start_apm_meter();
-                GetSteamPlayersInfo(false);
+
                 // перенесем запуск ридера сидов для того чтобы выполнить чтение позже
                 // ждем пока закончится игра
                 // здесь стоит так же проверять находится ли игра в списке процессов
@@ -266,7 +243,7 @@ void StatsCollector::check_game()
                             lpSharedMemory->MaxAPM = apm_meter.getMaxAPM();
                     }
                     Sleep(1000);
-                    QCoreApplication::processEvents();
+                    qApp->processEvents();
                     game_state = reader->readySend();
                 }
                 qDebug() << "Game Stop" << game_state << procIsActive;
@@ -288,7 +265,7 @@ void StatsCollector::check_game()
 //                while(procIsActive&&game_state!=0){
 //                    procIsActive = systemWin32::findProcessByWindowName("Dawn of War: Soulstorm");
 //                    Sleep(5000);
-//                    QCoreApplication::processEvents();
+//                    qApp->processEvents();
 //                    game_state = reader->readySend();
 //                }
 //                qDebug() << "Game Stop" << game_state << procIsActive;
@@ -299,16 +276,16 @@ void StatsCollector::check_game()
                 qDebug() << "Stats Break";
                 break;
         }
-        send_logfiles();
     }else{
         if(systemWin32::findProcessByWindowName("Dawn of War: Soulstorm")){
             // получим новые значения флагов
             enableStats = settings.value("settings/enableStats", true).toBool();
-            enableDXHook = settings.value("settings/enableDXHook", false).toBool();
-            lpSharedMemory->showMenu  = showMenu  = settings.value("settings/showMenu", true).toBool();
-            lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
-            lpSharedMemory->showAPM   = showAPM   = settings.value("settings/showAPM", true).toBool();
-
+            if(lpSharedMemory){
+                lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
+                lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
+                lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
+                lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
+            }
 //            // проверим валидность карты
 //            if(!reader->is_map_valid())
 //                download_map(reader->get_last_invalid_map());
@@ -317,14 +294,12 @@ void StatsCollector::check_game()
                 processFlags(true);
             }
             GetSteamPlayersInfo();
+
+            // отправим лог файлы
+            send_logfiles();
         }else{
             AllPlayersInfo.clear();
             reader->reset();
-            closeWithGame = settings.value("settings/closeWithGame", false).toBool();
-            if(closeWithGame){
-                qDebug() << "closeWithGame";
-                QCoreApplication::quit();
-            }
         }
     }
 }
@@ -348,7 +323,7 @@ void StatsCollector::toggleAPMVisibility()
 {
     if(lpSharedMemory){
         lpSharedMemory->showAPM = !lpSharedMemory->showAPM;
-        qDebug() << "APMVisibility:" << (lpSharedMemory->showAPM?"On":"Off");
+        qDebug() << "toggleAPMVisibility()" << lpSharedMemory->showAPM;
     }
 }
 
@@ -362,7 +337,7 @@ void StatsCollector::toggleRacesVisibility()
 {
     if(lpSharedMemory){
         lpSharedMemory->showRaces = !lpSharedMemory->showRaces;
-        qDebug() << "RacesVisibility:" << (lpSharedMemory->showRaces?"On":"Off");
+        qDebug() << "toggleRacesVisibility()" << lpSharedMemory->showRaces;
     }
 }
 
@@ -370,7 +345,7 @@ void StatsCollector::toggleMenuVisibility()
 {
     if(lpSharedMemory){
         lpSharedMemory->showMenu = !lpSharedMemory->showMenu;
-        qDebug() << "MenuVisibility:" << (lpSharedMemory->showMenu?"On":"Off");
+        qDebug() << "toggleMenuVisibility()" << lpSharedMemory->showMenu;
     }
 }
 
@@ -464,7 +439,7 @@ void StatsCollector::processFlags(bool force)
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, PID);
 
     if(hProcess==nullptr){
-        qDebug() << "Could not open process" << GetLastError();
+        qDebug() << "could not open process" << GetLastError();
         return;
     }
     if(tFog!=curFog||force){
@@ -539,7 +514,7 @@ bool StatsCollector::init_player()
         QSettings settings_second("HKEY_CURRENT_USER\\Software\\Valve\\Steam", QSettings::NativeFormat);
         steam_path = settings_second.value("SteamPath").toString();
     }
-    qDebug() << "Steam:" << steam_path;
+    qDebug() << steam_path;
 
     int Timestamp = 0;
     std::ifstream file(QString(steam_path+"/config/loginusers.vdf").toStdString());
@@ -556,16 +531,15 @@ bool StatsCollector::init_player()
     }
 
     QString player_name;
-
     Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+sender_steamID+"&format=json");
     QVariantMap player_info = QtJson::json_to_map(sender->get(request));
     QVariantMap response = player_info.value("response", QVariantMap()).toMap();
     QVariantList players = response.value("players", QVariantList()).toList();
     QVariantMap player = players.value(0, QVariantMap()).toMap();
     player_name = player.value("personaname", "").toString();
-    if(!player_name.isEmpty())
+    if(!player_name.isEmpty()){
         sender_name = player_name;
-
+    }
     // если игрок на данном аккаунте сейчас играет, и игра Soulstorm, то добавим его в список
     // после этого можно так же прерывать цикл, так как нужный игрок найден
     if(player.value("personastate", 0).toInt()==1&&
@@ -574,8 +548,7 @@ bool StatsCollector::init_player()
     else
         qDebug() << "Player" << player_name << "is offline";
     qDebug() << "Player's nickname and Steam ID associated with Soulstorm:" << sender_name << sender_steamID;
-
-    register_player(sender_name, sender_steamID, true);
+    register_player(sender_name, sender_steamID);
     return true;
 }
 
@@ -588,7 +561,7 @@ void StatsCollector::check_name()
     QVariantList players = response.value("players", QVariantList()).toList();
     QVariantMap player = players.value(0, QVariantMap()).toMap();
     player_name = player.value("personaname", "").toString();
-    if(sender_name!=player_name){
+    if(!player_name.isEmpty()&&sender_name!=player_name){
         sender_name = player_name;
         qDebug() << "Player nickname and Steam ID associated with Soulstorm:" << sender_name << sender_steamID;
         reader->setSender_name(sender_name);
@@ -596,12 +569,11 @@ void StatsCollector::check_name()
     }
 }
 
-void StatsCollector::register_player(QString name, QString sid, bool init)
+void StatsCollector::register_player(QString name, QString sid)
 {
     QByteArray enc_name = QUrl::toPercentEncoding(name,""," ");
-    QString reg_url = server_addr+"/regplayer.php?name="+enc_name+"&sid="+sid+"&version="+version+"&sender_sid="+sender_steamID+"&";
-//    qDebug() << reg_url;
-    if(init) reg_url += "init=true&";
+    QString reg_url = server_addr+"/regplayer.php?name="+enc_name+"&sid="+sid+"&version="+version+"&";
+    qDebug() << reg_url;
     reg_url += "key="+QLatin1String(SERVER_KEY)+"&";
     emit GET_REQUEST(reg_url);
 }
@@ -609,6 +581,7 @@ void StatsCollector::register_player(QString name, QString sid, bool init)
 QString StatsCollector::get_soulstorm_installlocation()
 {
     QString path = qApp->applicationDirPath();
+    qDebug() << path+"/Soulstorm.exe";
     if(QFile::exists(path+"/Soulstorm.exe"))
         return path;
 
@@ -625,20 +598,26 @@ QString StatsCollector::get_soulstorm_installlocation()
 StatsCollector::~StatsCollector()
 {
     stats_timer.stop();
+    qDebug() << "apm_meter thread stop";
     apm_thread->quit();
     apm_thread->wait();
+    qDebug() << "sender thread stop";
     sender_thread->quit();
     sender_thread->wait();
 
+    qDebug() << "Unmap View Of File";
     if(lpSharedMemory){
         memset(lpSharedMemory, 0, sizeof(TGameInfo));
         UnmapViewOfFile(lpSharedMemory);
     }
     if(hSharedMemory){
+        qDebug() << "Close Shared Memory Handle";
         CloseHandle(hSharedMemory);
     }
 
+    qDebug() << "delete reader";
     delete reader;
+    qDebug() << "StatsCollector destructor";
     log.finishLog();
 }
 
@@ -681,7 +660,7 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
         {
 //            total_size += mbi.RegionSize;
 
-            for (PCHAR readAddr = (PCHAR)mbi.BaseAddress; readAddr < (PCHAR)mbi.BaseAddress+mbi.RegionSize; readAddr += buffer.size() - 200) {
+            for (PVOID readAddr = mbi.BaseAddress; readAddr < mbi.BaseAddress+mbi.RegionSize; readAddr += buffer.size() - 200) {
                 SIZE_T bytesRead = 0;
 
                 // если функция вернула не ноль, то продолжим цикл
@@ -689,10 +668,10 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
                     continue;
                 if(bytesRead<200)
                     continue;
-                for (uint i = 0; i < bytesRead - 200; i++) {
+                for (int i = 0; i < bytesRead - 200; i++) {
                     bool match = false;
-                    for (uint j = 0; j < sizeof(steamHeader); j++)
-                        if (buffer[i + j] != static_cast<char>(steamHeader[j])){
+                    for (int j = 0; j < sizeof(steamHeader); j++)
+                        if (buffer[i + j] != steamHeader[j]){
                             match = false;
                             break;
                         }else match = true;
@@ -701,26 +680,26 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
                         continue;
 
                     int nickPos = i + 56;
-                    if (buffer[nickPos] < static_cast<char>(50) &&
-                        buffer[nickPos] > '0' &&
-                        buffer[nickPos + 1] == '0' &&
-                        buffer[nickPos + 2] == '0' &&
-                        buffer[nickPos + 3] == '0' &&
-                        buffer[nickPos - 1] == '0' &&
-                        buffer[nickPos - 2] == '0' &&
-                        buffer[nickPos - 3] == '0' &&
-                        buffer[nickPos - 4] == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2]   == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2+1] == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2+2] == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2+3] == '0') {
+                    if (buffer[nickPos] < 50 &&
+                            buffer[nickPos] > 0 &&
+                            buffer[nickPos + 1] == 0 &&
+                            buffer[nickPos + 2] == 0 &&
+                            buffer[nickPos + 3] == 0 &&
+                            buffer[nickPos - 1] == 0 &&
+                            buffer[nickPos - 2] == 0 &&
+                            buffer[nickPos - 3] == 0 &&
+                            buffer[nickPos - 4] == 0 &&
+                            buffer[nickPos+4+buffer[nickPos]*2] == 0 &&
+                            buffer[nickPos+4+buffer[nickPos]*2+1] == 0 &&
+                            buffer[nickPos+4+buffer[nickPos]*2+2] == 0 &&
+                            buffer[nickPos+4+buffer[nickPos]*2+3] == 0) {
                         QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
 
                         if(!steamIdStr.contains(QRegExp("^[0-9]{17}$")))
                             continue;
 
                         QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer[nickPos] * 2).data()).left(buffer[nickPos]);
-                        if(get_stats&&!PlayersInfo.contains(steamIdStr)){
+                        if(!PlayersInfo.contains(steamIdStr)){
 //                            qDebug() << steamIdStr << nick;
                             PlayersInfo.insert(steamIdStr, nick);
                         }
@@ -760,9 +739,7 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
 //                    qDebug() << lpSharedMemory->lobbyPlayers[i].apm << i;
                     ++i;
                 }
-
             }
-            if(i)lpSharedMemory->playersNumber = i;
         }
     }
 

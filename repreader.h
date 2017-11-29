@@ -3,43 +3,38 @@
 #include "replay.h"
 #include "player.h"
 #include "extendedbinreader.h"
+#include "game_action.h"
 #include <QDataStream>
+#include <QFile>
 
 class RepReader
 {
 public:
-    RepReader();
+    RepReader(QString fileName);
     ~RepReader();
 
-    Replay *replay;
+    Replay replay;
+    QFile *pfile;
 
-    bool ReadReplayFully(QDataStream *stream, QString fileName);
-    bool ReadHeader(QDataStream *stream, QString fullFileName);
-    bool convertReplayToSteamVersion(Replay *rep);
+    bool ReadReplayFully();
+    bool ReadHeader();
+    QByteArray getReplayData();
     bool convertReplayToSteamVersion();
+    bool convertReplayTo1_2Version();
     QString RenameReplay();
-    QString RenameReplay(Replay *rep);
     bool isStandart(int game_type);
     bool playerIsObserver(QString name);
     int GetAverageAPM(int id);
-
-    Replay *getReplay() const;
-    void setReplay(Replay *value);
-
+    void close();
+    static QString getReplayMod(QString replay);
+    static QString getReplayMap(QString replay);
 
 private:
 
-    bool OpenFile(QDataStream *stream);
-    void ReadPlayer();
+    Player *ReadPlayer();
     void ReadActionDetail();
 
-    int FindString(QString str, int max_offset);
-    QByteArray add_zeros(QString str);
-    QString remove_zeros(char *bytes, int len);
-
     int _lastTick;
-    Player *player;
-    WinConditions conditions;
     ExtendedBinReader *BinReader;
 };
 #endif //REPREADER_H

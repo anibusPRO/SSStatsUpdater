@@ -11,6 +11,14 @@
 //#include <QMessageBox>
 #include <QDebug>
 
+#ifndef MAKEULONGLONG
+#define MAKEULONGLONG(ldw, hdw) ((ULONGLONG(hdw) << 32) | ((ldw) & 0xFFFFFFFF))
+#endif
+
+#ifndef MAXULONGLONG
+#define MAXULONGLONG ((ULONGLONG)~((ULONGLONG)0))
+#endif
+
 class systemWin32
 {
 public:
@@ -18,15 +26,17 @@ public:
     ~systemWin32();
     void updateProcessList();
     bool findProcess(QString findProcName);
-    void closehSnapHandle();
+    static bool findProcess_2(QString findProcName);
     int findProcessCount(QString findProcName);
+    static bool findProcessByWindowName(QString name);
     QString getProcessName(int idProcess);
+    DWORD getProcessID(QString name);
+    DWORD getProcessIDByWindowName(QString name);
     QStringList getAllProcessList();
+    bool CloseProcessMainThread(DWORD dwProcID);
+    bool closeProcessByName(QString name);
 private:
-//    HANDLE hSnap;
-    QMap <int, QString> win32sysMap;
-    QString copyToQString(WCHAR array[MAX_PATH]);
-
+    QMap <DWORD, QString> win32sysMap;
 };
 
 #endif // SYSTEMWIN32_H

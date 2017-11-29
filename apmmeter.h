@@ -16,7 +16,7 @@ public:
     long getAverageAPM();
     long getCurrentAPM();
     long getMaxAPM();
-    long getTime();
+    DWORD getTime();
     long getTotalActions();
 
     bool stopped;

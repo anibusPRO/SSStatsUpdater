@@ -126,11 +126,6 @@ QString GameSettings::getResolvedResourceSpeed() const
     }
 }
 
-//LanguageService GameSettings::getLS() const
-//{
-//    return LS;
-//}
-
 QString GameSettings::getResolvedAIDiff() const
 {
     switch (AIDiff)

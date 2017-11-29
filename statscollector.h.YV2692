@@ -2,6 +2,7 @@
 #define STATSCOLLECTOR_H
 
 //# define NETWORK_SHOW_SEND_REQUESTS
+#include <QWidget>
 #include "requestsender.h"
 #include "gameinforeader.h"
 #include "gameinfo.h"
@@ -9,9 +10,8 @@
 #include "apmmeter.h"
 #include <QCoreApplication>
 #include <QTimer>
-#include <QThread>
 #include "defines.h"
-#include "qtxglobalshortcut/qxtglobalshortcut.h"
+#include <QxtGlobalShortcut>
 
 typedef struct{
     char name[100];
@@ -24,8 +24,6 @@ typedef struct{
 } TPlayer;
 
 typedef struct{
-    bool enableDXHook;
-    int version;
     char players[8][100];
     int playersNumber;
     TPlayer lobbyPlayers[50];
@@ -35,18 +33,21 @@ typedef struct{
     int MaxAPM;
     int downloadProgress;
     bool fontsInited;
-    bool showMenu;
+    bool showLogo;
     bool showRaces;
     bool showAPM;
 } TGameInfo;
 
 typedef TGameInfo *PGameInfo;
+namespace Ui {
+class StatsCollector;
+}
 
-class StatsCollector : public QObject
+class StatsCollector : public QWidget
 {
     Q_OBJECT
 public:
-    explicit StatsCollector(QObject *parent = 0);
+    explicit StatsCollector(QWidget *parent = 0);
     ~StatsCollector();
 
     bool start();
@@ -55,10 +56,10 @@ public:
     QTimer stats_timer;
 
 private:
+    Ui::StatsCollector *ui;
     void check_name();
     void download_map(QString map_name);
-    void register_player(QString name, QString sid, bool init=false);
-    QString GetRandomString() const;
+    void register_player(QString name, QString sid);
     QString get_soulstorm_installlocation();
     QString calcMD5(QString fileName);
     QString calcMD5(QByteArray data);
@@ -72,12 +73,9 @@ private:
     QString sender_steamID;
     QString sender_name;
     QString server_addr;
-    bool closeWithGame;
     bool enableDXHook;
     bool enableStats;
-    bool showMenu;
-    bool showRaces;
-    bool showAPM;
+    bool showStats;
     bool curFog;
     bool curHP;
     QString version;
@@ -97,6 +95,7 @@ private:
     QMap<QString, QString> PlayersInfo;
     QMap<QString, QString> AllPlayersInfo;
     int log_size;
+    QxtGlobalShortcut* menuShortcut;
 
 signals:
     void start_apm_meter();
@@ -112,12 +111,7 @@ signals:
 private slots:
     void check_game();
     void updateProgress(qint64 bytesSent, qint64 bytesTotal);
-    void toggleMenuVisibility();
-    void toggleRacesVisibility();
-    void toggleAPMVisibility();
-
-public slots:
-    void exitHandler();
+    void toggleVisibility();
 };
 
 #endif // STATSCOLLECTOR_H

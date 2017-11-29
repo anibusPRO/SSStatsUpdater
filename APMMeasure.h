@@ -30,7 +30,7 @@ public:
     void moveCurrentAPM();
     long getAverageAPM();
     long getCurrentAPM();
-    long getTime();
+    DWORD getTime();
     long getTotalActions();
     void resetAllAPM();
     APMLoggableSnapshot getSnapshot();

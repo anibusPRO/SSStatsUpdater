@@ -4,784 +4,339 @@
 #include "repreader.h"
 #include <QFile>
 #include <QStringList>
+#include <QTextCodec>
+#include <QDir>
 
-RepReader::RepReader()
+RepReader::RepReader(QString fileName)
 {
-    this->BinReader = 0;
+    pfile = new QFile(fileName);
+    if(pfile->open(QIODevice::ReadWrite)){
+        BinReader = new ExtendedBinReader(pfile);
+        replay.setFileName(fileName);
+        ReadReplayFully();
+    }else
+        qDebug() << "Could not open file" << fileName   ;
 }
 
 RepReader::~RepReader()
 {
     if(BinReader) delete BinReader;
-    if(replay)
+    close();
+}
+
+bool RepReader::ReadReplayFully()
+{
+    if (ReadHeader())
     {
-        for(int i=0;i<this->replay->Players.size();++i)
-            delete this->replay->Players[i];
-        for(int i=0;i<this->replay->Actions.size();++i)
-            delete this->replay->Actions[i];
-        delete replay;
-    }
-}
-
-Replay *RepReader::getReplay() const
-{
-    return replay;
-}
-
-void RepReader::setReplay(Replay *value)
-{
-    replay = value;
-}
-
-
-bool RepReader::ReadReplayFully(QDataStream *stream, QString fileName)
-{
-//    qDebug() << "Read Header";
-    if (this->ReadHeader(stream, fileName))
-    {
-//        qDebug() << "Read Players";
-        for (int players = 0; players < this->replay->Slots; players++)
-        {
-            this->ReadPlayer();
-            this->replay->Players.append(this->player);
-        }
-
-//        this->replay->ActionStart = BinReader->device()->pos();
-//        qDebug() << "Read Actions";
-//        this->ReadActionDetail();
+        for (uint players = 0; players < replay.Slots; players++)
+            replay.Players.append(ReadPlayer());
+//        qDebug() << BinReader->pos();
+//        ReadActionDetail();
         return true;
     }
     return false;
 }
 
-QString RepReader::remove_zeros(char *bytes, int len)
+bool RepReader::ReadHeader()
 {
-    QString temp_str="";
-    for(int i=0; i<len; i+=2)
-    {
-        temp_str += bytes[i];
-    }
-    return temp_str;
-}
+    // " версия"
+    replay.Version = BinReader->ReadInt32();
+//    qDebug() << replay.Version;
+    // пропускает количество симоволов и имя движка
+    replay.MOD = BinReader->ReadStringUTF8(32);
+//    qDebug() << replay.MOD;
+    BinReader->skipRawData(57); // Relic Chunky
+    /*qDebug() <<*/ BinReader->ReadStringUTF8(8); // DATADATA
+    BinReader->skipRawData(12);
+    //"длительность реплея в тиках системных часов"
+    replay.TotalTicks = BinReader->ReadInt32();
+    replay.Duration = replay.TotalTicks/8; // [c]
+    BinReader->skipRawData(24); // 1706509
+    /*qDebug() <<*/ BinReader->ReadStringUTF8(8); // FOLDINFO
+    BinReader->skipRawData(4);
+    replay.BeginFOLDINFO = BinReader->pos();
+    replay.LengthFOLDINFO = BinReader->ReadInt32();
+    BinReader->skipRawData(4); // 166857
+    /*qDebug() <<*/  BinReader->ReadStringUTF8(8); // GameInfo
+    BinReader->skipRawData(1);
+    /*qDebug() <<*/ BinReader->ReadStringUTF8(8); // FOLDWMAN
+    BinReader->skipRawData(4);
+    replay.BeginFOLDWMAN = BinReader->pos();
+    replay.LengthFOLDWMAN = BinReader->ReadInt32();
+    BinReader->skipRawData(32);
+    replay.PlayerCount = BinReader->ReadInt32();
+    // размер карты в ячейках
+    replay.MapSize = BinReader->ReadInt32();
+    // имя файла локали в котором хранится ссылка на локализованное имя карты
+    /*qDebug() <<*/ BinReader->ReadStringUTF8(BinReader->ReadInt32());
+    // локализованное имя карты
+    replay.MapLocale = BinReader->ReadStringUTF16(BinReader->ReadInt32());
+//    qDebug() << replay.MapLocale;
+    // CRC32 хеш сумма карты
+    QString map_name = BinReader->ReadStringUTF8(BinReader->ReadInt32());
+    replay.Map = map_name.right(map_name.size() - 18);
+    replay.MapCRC32 = BinReader->ReadInt32();
+//    qDebug() << replay.Map;
 
-int RepReader::GetAverageAPM(int id)
-{
-    return replay->GetPlayerMidApm(id);
-}
+    // 12 байт неизвестных данных
+    BinReader->skipRawData(12);
+    /*qDebug() <<*/ BinReader->ReadStringUTF8(8);
+    // "Версия chunk"
+    BinReader->skipRawData(4);
 
-// был случай, когда игрок находился в обсах, а другой игрок, с таким же ником был в слоте игрока
-// и тогда игрок из обса отправлял статистику, так как программа считала, что обс был в игре
-// поэтому решено проверять находился ли игрок с таким же ником в обсах
-bool RepReader::playerIsObserver(QString name)
-{
-    for(int i=0; i<this->replay->PlayerCount; ++i)
-        if(this->replay->Players.at(i)->Name==name&&this->replay->Players.at(i)->Type==4)
-            return true;
-    return false;
-}
+    replay.BeginDATABASE = BinReader->pos();
+    // "Размер chunk"
+    replay.LengthDATABASE = BinReader->ReadInt32();
 
-bool RepReader::ReadHeader(QDataStream *stream, QString fullFileName)
-{
-    this->replay = new Replay(fullFileName);
+    BinReader->skipRawData(16);
 
-    if (this->OpenFile(stream))
-    {
-        // " версия"
-        this->replay->Version = BinReader->ReadInt32();
-        // пропускает количество симоволов и имя движка
+    // "Размер слотов в игре. Всегда 8"
+    replay.Slots = BinReader->ReadInt32();
 
-        auto charactersBuffer = BinReader->ReadChars(31);
-        this->replay->MOD = QString(charactersBuffer);
-//        qDebug() << this->replay->MOD;
+    // сложность ИИ
+    replay.settings.AIDiff = BinReader->ReadInt32();
+    BinReader->skipRawData(4);
+    // начальные ресуры
+    replay.settings.StartRes = BinReader->ReadInt32();
+    BinReader->skipRawData(4);
+    // фиксированные команды
+    replay.settings.LockTeams = BinReader->ReadInt32();
+    BinReader->skipRawData(4);
+    // читы
+    replay.settings.CheatsON = BinReader->ReadInt32();
+    BinReader->skipRawData(4);
+    // начальные позиции
+    replay.settings.StartLocation = BinReader->ReadInt32();
+    BinReader->skipRawData(4);
+    // скорость игры
+    replay.settings.GameSpeed = BinReader->ReadInt32();
+    BinReader->skipRawData(4);
 
-        BinReader->ReadChars(45);
+    // шаринг ресурсов
+    replay.settings.ResShare = BinReader->ReadInt32();
+    /*qDebug() <<*/ BinReader->skipRawData(4);
 
-        auto POSTGAMEINFO = (BinReader->ReadChars(12));
+    // скорость прироста ресурсов
+    replay.settings.ResRate = BinReader->ReadInt32();
+    /*qDebug() <<*/ BinReader->skipRawData(4);
 
-        BinReader->ReadChar();
-        auto DATADATA = BinReader->ReadChars(8);
-//        qDebug() << DATADATA;
-        int *intyu = new int[3];
-        BinReader->ReadInt32Array(intyu, 3);
-        delete[] intyu;
+    BinReader->skipRawData(1);
+    replay.BeginNAME = (int)BinReader->pos();
+    // "Имя в списке реплеев"
+    int nameLength = BinReader->ReadInt32();
 
-        //"длительность реплея в тиках системных часов"
-        this->replay->TotalTicks = BinReader->ReadInt32();
-        this->replay->Duration = this->replay->TotalTicks/8; // [c]
-
-        BinReader->ReadChars(12);
-        BinReader->ReadInt32();
-        BinReader->ReadInt32();
-        BinReader->ReadInt32();
-
-        auto FOLDINFO = BinReader->ReadChars(8);
-//        qDebug() <<FOLDINFO;
-        BinReader->ReadInt32();
-
-        this->replay->BeginFOLDINFO = this->BinReader->device()->pos();
-        this->replay->LengthFOLDINFO = BinReader->ReadInt32();
-
-        BinReader->ReadInt32();
-
-        auto GAMEINFO =  BinReader->ReadChars(8);
-//        qDebug() <<GAMEINFO;
-        BinReader->ReadChar();
-
-        auto FOLDWMAN = BinReader->ReadChars(8);
-//        qDebug() <<FOLDWMAN;
-        BinReader->ReadInt32();
-
-        this->replay->BeginFOLDWMAN = this->BinReader->device()->pos();
-        this->replay->LengthFOLDWMAN = BinReader->ReadInt32();
-
-        int *intsf = new int[8];
-        BinReader->ReadInt32Array(intsf, 8);
-        delete[] intsf;
-
-        this->replay->PlayerCount = BinReader->ReadInt32();
-        this->replay->MapSize = BinReader->ReadInt32();
-
-
-        // пропускает количество симоволов и имя карты в файле локали
-        // "Мод"
-        auto tempValue = BinReader->ReadInt32();
-        BinReader->ReadChars(tempValue);
-
-
-        tempValue = BinReader->ReadInt32();
-//        char *locale = new char[tempValue*2];
-//        BinReader->ReadBytes(locale, tempValue*2);
-//        QString mapLocale = remove_zeros(locale, tempValue*2);
-//        this->replay->MapLocale = mapLocale;
-//        delete[] locale;
-
-        this->replay->MapLocale = QString::fromUtf16((ushort*)BinReader->ReadBytesArray(tempValue*2).data()).left(tempValue);
-//        qDebug() << tempValue << this->replay->MapLocale;
-
-        // размер называния карты "название карты"
-        tempValue = BinReader->ReadInt32();
-
-        auto mapNameBuffer = BinReader->ReadChars(tempValue);
-//        qDebug() << mapNameBuffer;
-        QString map_name(mapNameBuffer);
-        this->replay->Map = map_name.right(map_name.size() - 18);
-        qDebug() << this->replay->Map;
-        BinReader->ReadChars(16);
-        auto DATABASE = BinReader->ReadChars(8);
-//        qDebug() <<DATABASE;
-        // "Версия chunk"
-        BinReader->ReadInt32();
-
-        this->replay->BeginDATABASE = BinReader->device()->pos();
-        // "Размер chunk"
-        this->replay->LengthDATABASE = BinReader->ReadInt32();
-
-        BinReader->ReadChars(4);
-
-        qint16 *array = new qint16[6];
-        BinReader->ReadInt16Array(array, 6);
-        delete[] array;
-        // "Размер слотов в игре. Всегда 8"
-        this->replay->Slots = BinReader->ReadInt32();
-
-//        this->replay->BeginDATABASE = BinReader->device()->pos();
-//        this->replay->LengthDATABASE = BinReader->ReadInt32("Длина базы данных");
-
-        // сложность ИИ
-        this->replay->settings->AIDiff = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // начальные ресуры
-        this->replay->settings->StartRes = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // фиксированные команды
-        this->replay->settings->LockTeams = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // читы
-        this->replay->settings->CheatsON = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // начальные позиции
-        this->replay->settings->StartLocation = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // скорость игры
-        this->replay->settings->GameSpeed = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // шаринг ресурсов
-        this->replay->settings->ResShare = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        // скорость прироста ресурсов
-        this->replay->settings->ResRate = BinReader->ReadInt32();
-        /*qDebug() <<*/ BinReader->ReadChars(4);
-
-        BinReader->ReadChar();
-        this->replay->BeginNAME = (int)BinReader->device()->pos();
-        // "Имя в списке реплеев"
-        int nameLength = BinReader->ReadInt32();
-//        qDebug() << "nameLength" << nameLength;
-        if (nameLength <= 0 || nameLength > 48)
-        {
-            qDebug() << "Could not read replay name";
-            BinReader->ReadInt32();
-        }
-        else
-        {
-            replay->Name = QString::fromUtf16((ushort*)BinReader->ReadBytesArray(nameLength*2+4).data())/*.left(nameLength)*/;
-//            qDebug() << nameLength << replay->Name;
-//            char *cName = new char[nameLength];
-//            BinReader->ReadBytes(cName, nameLength*2);
-//            replay->Name = remove_zeros(cName, nameLength*2);
-//            delete[] cName;
-//            for(int i=0; i<nameLength*2;++i)
-//            {
-//                if(i%2==0)
-//                    this->player->Name+=BinReader->ReadChar();
-//                else
-//                    BinReader->ReadChar();
-//            }
-//            qDebug() <<replay->Name;
-        }
-
-//         пропустим 4 байта до условий победы
-//        BinReader->ReadInt32();
-        // "Условия победы"
-        auto count = BinReader->ReadInt32();
-
-        int *temp_array = new int[count];
-        BinReader->ReadInt32Array(temp_array, count);
-
-        QVector<int> win_conditions;
-        for(int i=0; i<count; ++i)
-            win_conditions.append(temp_array[i]);
-
-        this->replay->conditions->hasAnnihilate = win_conditions.contains((int)WinConditions::Annihilate );
-        this->replay->conditions->hasSuddenDeath = win_conditions.contains((int)WinConditions::SuddenDeath);
-        this->replay->conditions->hasAssassinate = win_conditions.contains((int)WinConditions::Assassinate);
-        this->replay->conditions->hasEconomicVictory = win_conditions.contains((int)WinConditions::EconomicVictory);
-        this->replay->conditions->hasControlArea = win_conditions.contains((int)WinConditions::ControlArea);
-        this->replay->conditions->hasDestroyHQ = win_conditions.contains((int)WinConditions::DestroyHQ);
-        this->replay->conditions->hasTakeAndHold = win_conditions.contains((int)WinConditions::TakeAndHold);
-        this->replay->conditions->hasGameTimer = win_conditions.contains((int)WinConditions::GameTimer);
-
-        BinReader->ReadChars(5);
-
-        this->replay->PlayerStart = BinReader->device()->pos();
-        delete[] temp_array;
-        return true;
-    }
+//    qDebug() << nameLength << BinReader->pos();
+    if (nameLength <= 0 || nameLength > 48)
+        qDebug() << "Could not read replay name";
     else
-    {
-        return false;
-    }
-}
+        replay.Name = BinReader->ReadStringUTF16(nameLength);
+//    qDebug() << replay.Name;
+    BinReader->skipRawData(4);
+    // "Условия победы"
+    auto count = BinReader->ReadInt32();
+    QVector<int> win_conditions;
+    for(int i=0; i<count; ++i)
+        win_conditions.append(BinReader->ReadInt32());
 
-QByteArray RepReader::add_zeros(QString str)
-{
-    QByteArray ar;
-    ar.resize(str.size()*2+4);
+    replay.hasAnnihilate = win_conditions.contains((int)Replay::Annihilate);
+    replay.hasSuddenDeath = win_conditions.contains((int)Replay::SuddenDeath);
+    replay.hasAssassinate = win_conditions.contains((int)Replay::Assassinate);
+    replay.hasEconomicVictory = win_conditions.contains((int)Replay::EconomicVictory);
+    replay.hasControlArea = win_conditions.contains((int)Replay::ControlArea);
+    replay.hasDestroyHQ = win_conditions.contains((int)Replay::DestroyHQ);
+    replay.hasTakeAndHold = win_conditions.contains((int)Replay::TakeAndHold);
+    replay.hasGameTimer = win_conditions.contains((int)Replay::GameTimer);
 
-    QDataStream stream(&ar, QIODevice::WriteOnly);
-    stream.setByteOrder(QDataStream::LittleEndian);
-    // запишем размер строки
-    stream << str.size();
-    // запишем символы строки разделяя нулями
-    for(int i=0; i<str.size()*2; ++i)
-    {
-        if(i%2==0)
-            ar[i+4] = str[i/2].toAscii();
-        else
-            ar[i+4] = 0x00;
-    }
-    return ar;
-}
+    BinReader->skipRawData(5);
 
-QString RepReader::RenameReplay()
-{
-    QString ingame_rep_name="";
-    QStringList clan_tags;
-    int p_count = replay->PlayerCount;
-    clan_tags <<"Cg|"<<"AZ|"<<"sF|"<<"HG|"<<"RuW|"<<"SWS}{"<<"Sugar_"<<"[TOXiC]"<<"{KILLA}"<<"[SWS]";
-    if(p_count==2)
-    {
-        for(int i=0; i<p_count; ++i)
-        {
-            foreach (QString tag, clan_tags) {
-                if(replay->Players.at(i)->Name.contains(tag))
-                    replay->Players[i]->Name = replay->Players.at(i)->Name.remove(0,tag.size());
-            }
-        }
-        ingame_rep_name += replay->Players.at(0)->getVeryShortRaceName();
-        ingame_rep_name += "v"+replay->Players.at(1)->getVeryShortRaceName() + "|";
-        ingame_rep_name += replay->getShortMapName() + "|";
-        ingame_rep_name += replay->Players.at(0)->Name.left(8);
-        ingame_rep_name += "V"+replay->Players.at(1)->Name.left(8);
-    }
-    else
-    {
-        for(int i=0; i<p_count; ++i)
-        {
-            ingame_rep_name += replay->Players.at(i)->getVeryShortRaceName();
-            if(i!=p_count-1) ingame_rep_name += "v";
-            else ingame_rep_name += "|";
-        }
-        ingame_rep_name += replay->getShortMapName();
-    }
-
-    // найдем строку за которой следует имя реплейя в файле
-    BinReader->device()->seek(replay->BeginNAME);
-
-    // получим длину названия реплея в игре
-    int rep_name_length = BinReader->ReadInt32();
-
-    // обновим размеры блоков данных в файле
-    // посчитаем разницу между старым и новым называнием
-    int bytesLengthDifference = (ingame_rep_name.size() - rep_name_length)*2;
-
-    this->BinReader->device()->seek(replay->BeginFOLDINFO);
-    this->BinReader->WriteInt32(replay->LengthFOLDINFO+bytesLengthDifference);
-
-    this->BinReader->device()->seek(replay->BeginDATABASE);
-    this->BinReader->WriteInt32(replay->LengthDATABASE+bytesLengthDifference);
-
-    this->BinReader->device()->seek(replay->BeginNAME+4+rep_name_length*2);
-    QByteArray temp_buffer;
-    temp_buffer = this->BinReader->device()->readAll();
-
-    this->BinReader->device()->seek(replay->BeginNAME);
-
-    QByteArray tr = add_zeros(ingame_rep_name);
-    BinReader->device()->write(tr);
-    BinReader->device()->write(temp_buffer);
-
-    QString rep_filename="",races="",players="";
-
-
-    for(int i=0; i<p_count; ++i)
-    {
-        races += replay->Players.at(i)->getVeryShortRaceName();
-        players += "#"+replay->Players.at(i)->Name;
-    }
-    if(p_count<8)
-        rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName()+players;
-    else
-        rep_filename += QString::number(p_count)+races+"#"+this->replay->getShortMapName();
-
-
-    rep_filename.replace(QRegExp("[^\\w\.#]"),"");
-    // чтобы игра смогла запустить реплей, размер его имени не должен превышать 54 символов
-    // 4 символа это расширение файла, 5 символов это разделитель + id игры, однако id постоянно растет
-    // и не всегда будет занимать 4 символа
-    // найдено решение, которое позволяет удалять id игры перед скачиванием файла
-    // поэтому можно увеличить размер имени файла до 50 символов
-    if(rep_filename.size()>50)
-        rep_filename.remove(50, rep_filename.size()-50);
-//    rep_filename.replace(QRegExp("[^\\w_~`!@#№$%^&\(\)\[\]\{\}\.,:;-+="),"");
-    return rep_filename;
-}
-
-QString RepReader::RenameReplay(Replay *rep)
-{
-//    QString rep_filename="";
-    QString ingame_rep_name="";
-
-    if(rep->PlayerCount==2)
-    {
-        QFile file(rep->FullFileName);
-
-        if(file.open(QIODevice::ReadWrite))
-        {
-            QDataStream in(&file);
-            OpenFile(&in);
-            for(int i=0; i<rep->PlayerCount; ++i)
-            {
-                if(rep->Players.at(i)->Name.contains("Cg|")||rep->Players.at(i)->Name.contains("AZ|")
-                        ||rep->Players.at(i)->Name.contains("sF|")||rep->Players.at(i)->Name.contains("HG|"))
-                    rep->Players[i]->Name = rep->Players.at(i)->Name.remove(0, 3);
-//                qDebug() <<"Cg|"<<"AZ|"<<"sF|"<<"HG|";
-                if(rep->Players.at(i)->Name.contains("RuW|"))
-                    rep->Players[i]->Name = rep->Players.at(i)->Name.remove(0, 4);
-                if(rep->Players.at(i)->Name.contains("SWS}{")||rep->Players.at(i)->Name.contains("AZ | "))
-                    rep->Players[i]->Name = rep->Players.at(i)->Name.remove(0, 5);
-                if(rep->Players.at(i)->Name.contains("Sugar_"))
-                    rep->Players[i]->Name = rep->Players.at(i)->Name.remove(0, 6);
-                if(rep->Players.at(i)->Name.contains("[TOXiC]")||rep->Players.at(i)->Name.contains("{KILLA}"))
-                    rep->Players[i]->Name = rep->Players.at(i)->Name.remove(0, 7);
-            }
-
-            ingame_rep_name += rep->Players.at(0)->Name.left(7);
-            ingame_rep_name += "V"+rep->Players.at(1)->Name.left(7) + "|";
-            ingame_rep_name += rep->Players.at(0)->getShortRaceName();
-            ingame_rep_name += "/"+rep->Players.at(1)->getShortRaceName() + "|";
-            ingame_rep_name += rep->getShortMapName();
-
-            // найдем строку за которой следует имя реплейя в файле
-            BinReader->device()->seek(rep->BeginNAME);
-
-            // получим длину названия реплея в игре
-            int rep_name_length = BinReader->ReadInt32();
-
-            // обновим размеры блоков данных в файле
-            // посчитаем разницу между старым и новым называнием
-            int bytesLengthDifference = (ingame_rep_name.size() - rep_name_length)*2;
-
-            this->BinReader->device()->seek(rep->BeginFOLDINFO);
-            this->BinReader->WriteInt32(rep->LengthFOLDINFO+bytesLengthDifference);
-
-            this->BinReader->device()->seek(rep->BeginDATABASE);
-            this->BinReader->WriteInt32(rep->LengthDATABASE+bytesLengthDifference);
-
-
-            this->BinReader->device()->seek(rep->BeginNAME+4+rep_name_length*2);
-            QByteArray temp_buffer;
-            temp_buffer = this->BinReader->device()->readAll();
-
-            this->BinReader->device()->seek(rep->BeginNAME);
-
-            QByteArray tr = add_zeros(ingame_rep_name);
-            BinReader->device()->write(tr);
-            BinReader->device()->write(temp_buffer);
-            file.close();
-        }
-    }
-    // получим данные о текущей дате
-//    QString date = QDateTime::currentDateTime().toString(".yyyy-MM-dd.hh-mm-ss'.png'");
-
-//    rep_filename += QString::number(rep->PlayerCount) + "P";
-//    for(int i=0; i<rep->PlayerCount; ++i)
-//        rep_filename += "_"+rep->Players.at(i)->Name;
-//    for(int i=0; i<rep->PlayerCount; ++i)
-//        rep_filename += "_"+rep->Players.at(i)->getShortRaceName();
-//    rep_filename += "_"+rep->getShortMapName();
-
-    return QString();
-}
-
-
-bool RepReader::OpenFile(QDataStream *stream)
-{
-    if(!this->BinReader) this->BinReader = new ExtendedBinReader(stream->device());
-    else this->BinReader->setDevice(stream->device());
+    replay.PlayerStart = BinReader->pos();
     return true;
+}
+
+QByteArray RepReader::getReplayData()
+{
+    pfile->seek(0);
+    return pfile->readAll();
 }
 
 bool RepReader::isStandart(int game_type)
 {
-    if(!replay->conditions->isStandart(game_type))
-        return false;
-    if(!replay->settings->isStandart(game_type))
-        return false;
-    return true;
+    return replay.isStandart(game_type);
 }
 
-int RepReader::FindString(QString str, int max_offset)
+Player *RepReader::ReadPlayer()
 {
-    QString temp_str("");
-    bool flag=true;
-    int j = max_offset;
-    while(j)
-    {   char temp_char = this->BinReader->ReadChar();
-        if(str.contains(temp_char))
-        {
-            temp_str +=temp_char;
-            for(int i = 0; i<str.size()-1; ++i)
-            {
-                temp_char = this->BinReader->ReadChar();
-                if(str.contains(temp_char))
-                {
-                    temp_str +=temp_char;
-                    flag=true;
-                }
-                else
-                {
-                    temp_str.clear();
-                    flag=false;
-                    break;
-                }
-            }
-        }
-        else temp_str.clear();
-        if(temp_str==str)
-            break;
-        --j;
-    }
-    if(flag)
-        return this->BinReader->device()->pos()-str.size();
-    else
-        return 0;
-}
-
-void RepReader::ReadPlayer()
-{
-
-    this->player = new Player();
-
-    auto charactersBuffer = BinReader->ReadChars(8);
-    QString readerString(charactersBuffer);
+    Player *player = new Player();
+    auto readerString = BinReader->ReadStringUTF8(8);
+//    qDebug() << BinReader->pos();
     if (readerString == "FOLDGPLY")
     {
-        // "Версия chunk'а"
-        BinReader->ReadInt32();
+        BinReader->skipRawData(4);
+        long pos = BinReader->pos();
+        replay.FOLDGPLYz.insert(pos, BinReader->ReadInt32());
+//        qDebug() << replay.FOLDGPLYz.keys().last();
+        BinReader->skipRawData(16);
+        pos = BinReader->pos();
+        replay.DATAINFOz.insert(pos, BinReader->ReadInt32());
 
-        this->replay->BeginFOLDGPLYz.append(BinReader->device()->pos());
+        BinReader->skipRawData(4);
 
-        this->player->Temp = BinReader->ReadInt32();
-
-        this->player->Bytes = BinReader->ReadChars(16);
-
-        this->replay->BeginPlayersChunkDataSizes.insert(BinReader->device()->pos(), BinReader->ReadInt32());
-
-         BinReader->ReadInt32();
-
-        // "Ниже идет имя игрока"
-        auto nameLength = BinReader->ReadInt32();
-        player->Name = QString::fromUtf16((ushort*)BinReader->ReadBytesArray(nameLength*2).data()).left(nameLength);
-//        qDebug() << nameLength << player->Name;
-
+        player->Name = BinReader->ReadStringUTF16(BinReader->ReadInt32());
         // "Тип игрока 0 Host/2 player/4 specc/7 empty/1,3,11 computer"
-        this->player->Type = BinReader->ReadInt32();
-        // "Номер команды игрока"
-        this->player->Team = BinReader->ReadInt32() + 1;
+        player->Type = BinReader->ReadInt32();
+        player->Team = BinReader->ReadInt32() + 1;
+        player->Race = BinReader->ReadStringUTF8(BinReader->ReadInt32());
 
-        auto tempValue = BinReader->ReadInt32();
+//        qDebug() << BinReader->pos();
+        if(replay.getVersion()==9)
+            BinReader->skipRawData(49);
+        else
+            BinReader->skipRawData(61);
 
-        this->player->Race = BinReader->ReadChars(tempValue);
+//        replay.BeginPlayerDiffirences.append(BinReader->pos());
 
-        BinReader->ReadInt32();
-        BinReader->ReadChars(45);
-
-        this->replay->BeginPlayerDiffirences.append(BinReader->device()->pos());
-
-        BinReader->ReadChars(12);
         // если игрок не обозреватель
         if(player->Type!=7)
         {
-            charactersBuffer = BinReader->ReadChars(8);
-            QString readerString(charactersBuffer);
+            readerString = BinReader->ReadStringUTF8(8);
             if (readerString == "FOLDTCUC")
             {
-                auto empB = BinReader->ReadChars(12);
-
-                auto DATALCIN = BinReader->ReadChars(8);
-
-                BinReader->ReadInt32();
-                tempValue = BinReader->ReadInt32();
-                charactersBuffer = BinReader->ReadChars(tempValue);
-
-                BinReader->ReadInt32();
-
-                auto DATAUNCU = BinReader->ReadChars(8);
-//                qDebug() << DATAUNCU;
-                BinReader->ReadInt32();
-                BinReader->ReadInt32();
-                BinReader->ReadInt32();
-
-                tempValue = BinReader->ReadInt32();
-                BinReader->ReadChars(tempValue * 2);
-                BinReader->ReadChars(20);
+//                qDebug() << readerString  << BinReader->pos();
+                BinReader->skipRawData(4);
+                BinReader->skipRawData(BinReader->ReadInt32()+4);
 
                 for (int bannerbadge = 0; bannerbadge < 2; bannerbadge++)
                 {
-                    charactersBuffer = BinReader->ReadChars(8);
-                    readerString = charactersBuffer;
-
+                    readerString = BinReader->ReadStringUTF8(8);
                     if (readerString == "FOLDTCBD")
                     {
-//                        qDebug() << "FOLDTCBD";
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-
-                        charactersBuffer = BinReader->ReadChars(8);
-                        readerString = charactersBuffer;
-
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-                        tempValue = BinReader->ReadInt32();
-                        charactersBuffer = BinReader->ReadChars(tempValue);
-                        readerString = charactersBuffer;
-
-                        charactersBuffer = BinReader->ReadChars(8);
-                        readerString = charactersBuffer;
-
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        // "Высота бэйджа"
-                        int height = BinReader->ReadInt32();
-                        // "Ширина бэйджа"
-                        int width = BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-                        charactersBuffer = BinReader->ReadChars(8);
-                        readerString = charactersBuffer;
-
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-                        for (int y = 0; y < height; y++)
-                            for (int x = 0; x < width; x++)
-                                BinReader->ReadChars(4);
+//                        qDebug() << readerString << BinReader->pos();
+                        BinReader->skipRawData(4);
+                        BinReader->skipRawData(BinReader->ReadInt32()+4);
+//                        // "Высота бэйджа"
+//                        int height = BinReader->ReadInt32();
+//                        // "Ширина бэйджа"
+//                        int width = BinReader->ReadInt32();
+//                        BinReader->skipRawData(24);
+//                        BinReader->skipRawData(height*width*4);
                     }
                     else if (readerString == "FOLDTCBN")
                     {
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt64();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-                        tempValue = BinReader->ReadInt32();
-
-                        charactersBuffer = BinReader->ReadChars(tempValue);
-                        readerString = charactersBuffer;
-
-                        BinReader->ReadInt64();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        // "Ширина баннера"
-                        int width = BinReader->ReadInt32();
-                        // "Высота баннера"
-                        int height = BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-                        BinReader->ReadInt64();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-                        BinReader->ReadInt32();
-
-                        for (int y = 0; y < height; y++)
-                            for (int x = 0; x < width; x++)
-                                BinReader->ReadChars(4);
+//                        qDebug() << readerString << BinReader->pos();
+                        BinReader->skipRawData(4);
+                        BinReader->skipRawData(BinReader->ReadInt32()+4);
+//                        // "Ширина баннера"
+//                        int width = BinReader->ReadInt32();
+//                        // "Высота баннера"
+//                        int height = BinReader->ReadInt32();
+//                        BinReader->skipRawData(24);
+//                        BinReader->skipRawData(height*width*4);
                     }
                     else
                     {
                         bannerbadge = 2;
-                        BinReader->device()->seek(BinReader->device()->pos()-8);
+                        BinReader->seek(BinReader->pos()-8);
                     }
                 }
             }
             else
             {
-                BinReader->device()->seek(BinReader->device()->pos()-8);
+                BinReader->seek(BinReader->pos()-8);
             }
         }
     }
     else
     {
-        BinReader->device()->seek(BinReader->device()->pos()-8);
+        BinReader->seek(BinReader->pos()-8);
     }
+//    qDebug() << player->Name;
+    return player;
 }
 
 void RepReader::ReadActionDetail()
 {
-    while (BinReader->device()->pos() < BinReader->device()->size())
+    BinReader->seek(replay.LengthFOLDINFO+170);
+    replay.ActionStart = BinReader->pos();
+    qDebug() << replay.ActionStart;
+    while (BinReader->pos() < BinReader->device()->size())
     {
         int action1 = BinReader->ReadInt32();
         int action1Len = BinReader->ReadInt32();
 
         if (action1==1)
         {
-//            qDebug() << "MsgPos:" << BinReader->device()->pos();
-            int action2 = BinReader->ReadByte();
+            int player_id = 0;
+            qDebug() << "MsgPos:" << BinReader->pos();
+            int action2 = BinReader->ReadInt32();
             if (action2==1)
             {
-//                qDebug() << "Chat Message Type 1:" << BinReader->device()->pos();
-                BinReader->ReadBytesArray(3);
-                BinReader->ReadInt32();
-                BinReader->ReadByte();
+                qDebug() << "Chat Message Type 1:" << BinReader->pos();
+                BinReader->skipRawData(5);
+                QString sender = BinReader->ReadStringUTF16(BinReader->ReadInt32());
+                player_id = BinReader->ReadInt32();
+                BinReader->skipRawData(8);
+                QString msg = BinReader->ReadStringUTF16(BinReader->ReadInt32());
 
-                auto tempValue = BinReader->ReadInt32();
-                qDebug() << QString::fromUtf16((ushort*)BinReader->ReadBytesArray(tempValue*2).data()).left(tempValue);
-
-
-                BinReader->ReadInt32();
-                BinReader->ReadInt32();
-                BinReader->ReadInt32();
-
-                auto mesLength = BinReader->ReadInt32();
-                qDebug() << QString::fromUtf16((ushort*)BinReader->ReadBytesArray(mesLength*2).data()).left(mesLength);
-
+                qDebug() << QString("%1:%2").arg(_lastTick/8/60, 2).arg(_lastTick/8%60, 2)
+                         << player_id << QString(sender+": "+msg);
             }
             else if (action2==action1Len)
             {
-//                qDebug() << "Chat Message Type 2:" << BinReader->device()->pos();
-                auto tempValue = BinReader->ReadInt32();
-                BinReader->device()->seek(tempValue * 4+16);
+//                qDebug() << "Chat Message Type 2:" << BinReader->pos();
+                BinReader->seek(BinReader->ReadInt32() * 4+16);
             }
             else
             {
-//                qDebug() << "Chat Message Type 3:" << BinReader->device()->pos();
-                BinReader->ReadChars(3);
+                // скорей всего это сообщение о смерти игрока или его вылете
+//                qDebug() << "Chat Message Type 3:" << BinReader->pos();
                 auto tempValue = BinReader->ReadInt32();
-                BinReader->ReadByte();
-                BinReader->ReadChars(tempValue);
+                BinReader->ReadChar();
+                player_id = BinReader->ReadInt32();
+                BinReader->ReadStringUTF8(tempValue-4);
+//                qDebug() << QString("%1:%2").arg(_lastTick/8/60, 2).arg(_lastTick/8%60, 2)
+//                         << player_id;
             }
         }
         else if (action1 == 0 && action1Len > 17)
         {
-            auto startActionPosition = BinReader->device()->pos();
-//            qDebug() << "Read Action" << startActionPosition;
-            if (action1Len < 55)
-            {
-//                qDebug() << "action1Len < 55";
-//                /*currentAction->AdditionalInfo = */BinReader->ReadChars(action1Len);
-//                currentAction->IsForced = true;
-//                this->replay->Actions.append(currentAction);
-//                continue;
-            }
-
+//            qDebug() << "Read Action" << BinReader->pos();
             // всегда 80
-            BinReader->ReadByte();
+            BinReader->skipRawData(1);
 
             _lastTick = BinReader->ReadInt32();
 
 //            qDebug() << 0;
-            // number of actions performed in total.
-            this->replay->ActionCount = BinReader->ReadInt32();
-            // 'random' number generated during the game to calculate whether projectiles hit etc.
+            // общее количество выполненных действий
+            replay.ActionCount = BinReader->ReadInt32();
+            // «Случайный» номер, сгенерированный во время игры, для расчета того, ударили ли снаряды и т.д.
             BinReader->ReadInt32();
 
             auto action_count = BinReader->ReadInt32();
 
 //            qDebug() << 1 << action_count;
-            while((--action_count+1)!=0)
+            while(--action_count!=-1)
             {
-                BinReader->ReadInt32();
-                BinReader->ReadInt32();
+                BinReader->skipRawData(8);
 //                qDebug() << 1.1;
                 int temp_len = BinReader->ReadInt32();
-                BinReader->ReadByte();
+                BinReader->skipRawData(1);
 //                qDebug() << 1.2 << temp_len;
                 int i = 0;
-                while( i<temp_len)
+                while(i<temp_len)
                 {
 //                    qDebug() << 2;
-                    int j = 0 ;
+                    int j = 0;
                     GameAction *currentAction = new GameAction();
                     currentAction->Tick = _lastTick;
-                    auto actionPos = BinReader->device()->pos();
-
-                    auto sub_action_len = BinReader->ReadByte();
-                    BinReader->ReadByte();
+//                    auto actionPos = BinReader->pos();
+                    auto sub_action_len = BinReader->ReadInt16();
                     BinReader->ReadInt32();
                     j += 6;
 //                    qDebug() << 3 << sub_action_len;
                     currentAction->Kind = BinReader->ReadInt32();
                     currentAction->KindValue = BinReader->ReadInt32();
 
-                    BinReader->ReadByte();
+                    BinReader->skipRawData(1);
                     j += 9;
                     qint16 pNum1 = BinReader->ReadInt16();
 //                    qDebug() << 4 << currentAction->Kind << pNum1;
@@ -790,7 +345,7 @@ void RepReader::ReadActionDetail()
 //                    qDebug() << "Player Number" << currentAction->PlayerNumber  << pNum2;
 //                    if(currentAction->PlayerNumber==0)
 //                    {
-//                        qDebug() << "SubActionPos:" << BinReader->device()->pos();
+//                        qDebug() << "SubActionPos:" << BinReader->pos();
 //                        qDebug() << "Action:" << currentAction->Kind << currentAction->KindValue;
 //                    }
 
@@ -807,108 +362,221 @@ void RepReader::ReadActionDetail()
 
                     i += sub_action_len;
 
-                    this->replay->Actions.append(currentAction);
+                    replay.Actions.append(currentAction);
                 }
             }
         }
         else
-            BinReader->ReadBytesArray(action1Len);
+            BinReader->skipRawData(action1Len);
     }
-}
-
-bool RepReader::convertReplayToSteamVersion(Replay *rep)
-{
-    QFile file(rep->FullFileName);
-
-    if(file.open(QIODevice::ReadWrite))
-    {
-        QDataStream in(&file);
-        OpenFile(&in);
-        QByteArray ar;
-        ar.resize(12);
-        // запишем символы строки разделяя нулями
-        for(int i=0; i<12; ++i)
-            ar[i] = 0x00;
-        // запишем новую версию реплея
-        BinReader->WriteInt32(10);
-        BinReader->device()->seek(rep->BeginFOLDINFO);
-        BinReader->WriteInt32(rep->LengthFOLDINFO+12*rep->BeginFOLDGPLYz.size());
-        for(int i=0; i<rep->BeginFOLDGPLYz.size(); ++i)
-        {
-            // переходим в позицию начала длины FOLDGPLY + смещение соответствующее номеру слота
-            BinReader->device()->seek(rep->BeginFOLDGPLYz.at(i)+i*12);
-            // получаем длину FOLDGPLY
-            int LengthFOLDGPLY = BinReader->ReadInt32();
-            // возвращаемся в позцию начала длины
-            BinReader->device()->seek(rep->BeginFOLDGPLYz.at(i)+i*12);
-            // пишем новую длину
-            BinReader->WriteInt32(LengthFOLDGPLY + 12);
-            // пропускаем байты до длины DATAINFO
-            BinReader->ReadChars(16);
-            // читаем длину DATAINFO
-            int LengthDATAINFO = BinReader->ReadInt32();
-            // возвращаемся
-            BinReader->device()->seek(BinReader->device()->pos()-4);
-            // пишем новую длину
-            BinReader->WriteInt32(LengthDATAINFO + 12);
-            // позиция после длины DATAINFO
-            int BeginDATAINFO = BinReader->device()->pos();
-            // перед записью делаем копию данных после записываемого
-            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
-            QByteArray temp_buffer;
-            temp_buffer = this->BinReader->device()->read(this->BinReader->device()->size() - BinReader->device()->pos());
-            // возвращаемся в место записи
-            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
-            BinReader->device()->write(ar);
-            // пишем данные которые должны идти после
-            BinReader->device()->write(temp_buffer);
-        }
-        file.close();
-        return true;
-    }
-    return false;
 }
 
 bool RepReader::convertReplayToSteamVersion()
 {
-    QFile file(replay->FullFileName);
-
-    if(file.open(QIODevice::ReadWrite))
-    {
-        QDataStream in(&file);
-        OpenFile(&in);
-        QByteArray ar;
-        // запишем символы строки разделяя нулями
-        for(int i=0; i<12; ++i) ar.append('\x00');
-
-        // запишем новую версию реплея
-        BinReader->WriteInt32(10);
-        BinReader->device()->seek(replay->BeginFOLDINFO);
-        // изменяем размера блока FOLDINFO
-        BinReader->WriteInt32(replay->LengthFOLDINFO+12*replay->BeginFOLDGPLYz.size());
-        // выполняем проход по всем блокам FOLDGPLY
-        for(int i=0; i<replay->BeginFOLDGPLYz.size(); ++i)
-        {
-            BinReader->device()->seek(replay->BeginFOLDGPLYz.at(i)+i*12);
-            int LengthFOLDGPLY = BinReader->ReadInt32();
-            BinReader->device()->seek(replay->BeginFOLDGPLYz.at(i)+i*12);
-            // изменяем размера блока FOLDGPLY
-            BinReader->WriteInt32(LengthFOLDGPLY + 12);
-            BinReader->ReadChars(16);
-            int LengthDATAINFO = BinReader->ReadInt32();
-            BinReader->device()->seek(BinReader->device()->pos()-4);
-            // изменяем размера блока DATAINFO
-            BinReader->WriteInt32(LengthDATAINFO + 12);
-            int BeginDATAINFO = BinReader->device()->pos();
-            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
-            QByteArray temp_buffer;
-            temp_buffer = this->BinReader->device()->read(this->BinReader->device()->size() - BinReader->device()->pos());
-            BinReader->device()->seek(BeginDATAINFO+LengthDATAINFO-40);
-            BinReader->device()->write(ar);
-            BinReader->device()->write(temp_buffer);
-        }
-        file.close();
+    if(replay.getVersion()==10)
         return true;
+
+    QFileInfo replay_info(replay.fileName);
+    QDir current_dir;
+    QString home_dir = current_dir.absolutePath();
+    current_dir.cd(replay_info.absolutePath());
+    QFile::copy(replay.fileName, "replay_backup.rec");
+
+    BinReader->seek(0);
+    // запишем новую версию реплея
+    BinReader->WriteInt32(10);
+//    qDebug() << replay.BeginFOLDINFO << replay.LengthFOLDINFO << replay.FOLDGPLYz.size();
+    BinReader->seek(replay.BeginFOLDINFO);
+    // изменяем размера блока FOLDINFO
+    BinReader->WriteInt32(replay.LengthFOLDINFO+12*replay.FOLDGPLYz.size());
+
+    // выполняем проход по всем блокам FOLDGPLY
+    for(int i=0; i<replay.FOLDGPLYz.size(); ++i)
+    {
+//        qDebug() << replay.FOLDGPLYz.keys().at(i);
+
+        // изменяем размера блока FOLDGPLY
+        BinReader->seek(replay.FOLDGPLYz.keys().at(i)+i*12);
+//        qDebug() << replay.FOLDGPLYz.values().at(i);
+        BinReader->WriteInt32(replay.FOLDGPLYz.values().at(i)+12);
+
+        // изменяем размера блока DATAINFO
+        BinReader->skipRawData(16);
+        int LengthDATAINFO = replay.DATAINFOz.values().at(i);
+//        qDebug() << LengthDATAINFO;
+        BinReader->WriteInt32(LengthDATAINFO+12);
+
+        int BeginDATAINFO = BinReader->pos();
+        BinReader->seek(BeginDATAINFO+LengthDATAINFO-40);
+
+        QByteArray temp_buffer = QByteArray(12, 0)+BinReader->device()->readAll();
+        BinReader->seek(BeginDATAINFO+LengthDATAINFO-40);
+        BinReader->device()->write(temp_buffer);
     }
+
+
+    QFile::remove("replay_backup.rec");
+    current_dir.cd(home_dir);
+    return true;
+}
+
+
+bool RepReader::convertReplayTo1_2Version()
+{
+//    if(rep_reader.replay.getVersion()==9)
+//        return true;
+//    BinReader->seek(replay.LengthFOLDINFO+170);
+
+    return true;
+}
+
+
+QString RepReader::RenameReplay()
+{
+    if(replay.Name.isEmpty())
+       return QString();
+
+    QString ingame_rep_name="";
+    QStringList clan_tags;
+    int p_count = replay.PlayerCount;
+    clan_tags <<"Cg|"<<"AZ|"<<"sF|"<<"HG|"<<"RuW|"<<"SWS}{"<<"Sugar_"<<"[TOXiC]"<<"{KILLA}"<<"[SWS]";
+    if(p_count==2)
+    {
+        for(int i=0; i<p_count; ++i)
+        {
+            QString name = replay.Players.at(i)->Name;
+            foreach (QString tag, clan_tags) {
+                if(name.contains(tag))
+                    replay.Players[i]->Name = name.remove(tag);
+            }
+        }
+        ingame_rep_name += replay.Players.at(0)->getVeryShortRaceName();
+        ingame_rep_name += "v"+replay.Players.at(1)->getVeryShortRaceName() + "|";
+        ingame_rep_name += replay.getShortMapName() + "|";
+        ingame_rep_name += replay.Players.at(0)->Name.left(8);
+        ingame_rep_name += "V"+replay.Players.at(1)->Name.left(8);
+    }
+    else
+    {
+        for(int i=0; i<p_count; ++i)
+        {
+            ingame_rep_name += replay.Players.at(i)->getVeryShortRaceName();
+            if(i!=p_count-1) ingame_rep_name += "v";
+            else ingame_rep_name += "|";
+        }
+        ingame_rep_name += replay.getShortMapName();
+    }
+
+    // найдем строку за которой следует имя реплейя в файле
+    BinReader->seek(replay.BeginNAME);
+
+    // получим длину названия реплея в игре
+    int rep_name_length = BinReader->ReadInt32();
+
+    // обновим размеры блоков данных в файле
+    // посчитаем разницу между старым и новым называнием
+    int bytesLengthDifference = (ingame_rep_name.size() - rep_name_length)*2;
+
+    BinReader->seek(replay.BeginFOLDINFO);
+    BinReader->WriteInt32(replay.LengthFOLDINFO+bytesLengthDifference);
+
+    BinReader->seek(replay.BeginDATABASE);
+    BinReader->WriteInt32(replay.LengthDATABASE+bytesLengthDifference);
+
+    BinReader->seek(replay.BeginNAME+4+rep_name_length*2);
+    QByteArray temp_buffer;
+    temp_buffer = BinReader->device()->readAll();
+
+    BinReader->seek(replay.BeginNAME);
+    *BinReader << ingame_rep_name.size();
+    QTextCodec *codec = QTextCodec::codecForName("UTF-16");
+    QTextEncoder *encoderWithoutBom = codec->makeEncoder( QTextCodec::IgnoreHeader );
+    QByteArray tr = encoderWithoutBom->fromUnicode(ingame_rep_name)+temp_buffer;
+    BinReader->device()->write(tr);
+
+    QString rep_filename="",races="",players="";
+
+
+    for(int i=0; i<p_count; ++i)
+    {
+        races += replay.Players.at(i)->getVeryShortRaceName();
+        players += "#"+replay.Players.at(i)->Name;
+    }
+    if(p_count<8)
+        rep_filename += QString::number(p_count)+races+"#"+replay.getShortMapName()+players;
+    else
+        rep_filename += QString::number(p_count)+races+"#"+replay.getShortMapName();
+
+
+    rep_filename.replace(QRegExp("[^\\w\.#]"),"");
+    // чтобы игра смогла запустить реплей, размер его имени не должен превышать 54 символов
+    // 4 символа это расширение файла, 5 символов это разделитель + id игры, однако id постоянно растет
+    // и не всегда будет занимать 4 символа
+    // найдено решение, которое позволяет удалять id игры перед скачиванием файла
+    // поэтому можно увеличить размер имени файла до 50 символов
+    if(rep_filename.size()>50)
+        rep_filename.remove(50, rep_filename.size()-50);
+//    rep_filename.replace(QRegExp("[^\\w_~`!@#№$%^&\(\)\[\]\{\}\.,:;-+="),"");
+    return rep_filename;
+}
+
+int RepReader::GetAverageAPM(int id)
+{
+    return replay.getPlayerApm(id);
+}
+
+void RepReader::close()
+{
+    if(pfile!=nullptr){
+        pfile->close();
+        delete pfile;
+        pfile = nullptr;
+    }
+}
+
+QString RepReader::getReplayMod(QString replay)
+{
+    QFile file(replay);
+    QString modName;
+    if(file.open(QIODevice::ReadOnly)){
+        QDataStream out(&file);
+        out.skipRawData(4);
+        char temp[33]={0};
+        out.readRawData(temp, 32);
+        modName = QString::fromUtf8(temp);
+        file.close();
+    }
+    return modName;
+}
+
+QString RepReader::getReplayMap(QString replay)
+{
+    QFile file(replay);
+    QString mapName;
+    if(file.open(QIODevice::ReadOnly)){
+        QDataStream out(&file);
+        out.setByteOrder(QDataStream::LittleEndian);
+        out.skipRawData(226);
+        qint32 count;
+        out >> count;
+        out.skipRawData(count);
+        out >> count;
+//        qDebug() << count << out.device()->pos();
+        char temp[count*2+2]={0};
+        out.readRawData(temp, count*2);
+        mapName = QString::fromUtf16((ushort*)temp);
+        file.close();
+    }
+    return mapName;
+}
+
+// был случай, когда игрок находился в обсах, а другой игрок, с таким же ником был в слоте игрока
+// и тогда игрок из обса отправлял статистику, так как программа считала, что обс был в игре
+// поэтому решено проверять находился ли игрок с таким же ником в обсах
+bool RepReader::playerIsObserver(QString name)
+{
+    for(int i=0; i<replay.PlayerCount; ++i)
+        if(replay.Players.at(i)->Name==name&&replay.Players.at(i)->Type==4)
+            return true;
     return false;
 }

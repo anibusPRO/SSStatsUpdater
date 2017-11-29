@@ -109,7 +109,7 @@ long APMMeasure::getAverageAPM() {
 	return computeAPM(getTotalActions(), GetTickCount()-absolute_starttick);
 }
 
-long APMMeasure::getTime()
+DWORD APMMeasure::getTime()
 {
     return GetTickCount()-absolute_starttick;
 }

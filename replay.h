@@ -6,154 +6,83 @@
 #include "game_action.h"
 #include "player.h"
 #include "gamesettings.h"
-#include "winconditions.h"
 
 class GameAction;
 
 class Replay
 {
 public:
-    Replay(QString fullFileName);
+    Replay();
     ~Replay();
+
+    void setFileName(QString name);
+    int getPlayerApm(int id);
+    QString getShortMapName() const;
+    int getVersion() const;
+    uint getTeamsCount() const;
+    bool isAnyAverageAPMAbove(uint apm);
+    bool isStandart(int game_type);
+
+    GameSettings settings;
+    enum ConditionValues
+    {
+        Annihilate = 1003066394, //767227721
+        SuddenDeath = -1826760460,
+        Assassinate = 200405640,
+        EconomicVictory = -242444938,
+        ControlArea = 735076042,
+        DestroyHQ = 1509920563,
+        TakeAndHold = 1959084950,
+        GameTimer = 69421273
+    };
+
+    bool hasTakeAndHold;
+    bool hasDestroyHQ;
+    bool hasControlArea;
+    bool hasEconomicVictory;
+    bool hasSuddenDeath;
+    bool hasAnnihilate;
+    bool hasAssassinate;
+    bool hasGameTimer;
 
     QString Hash;
 
     bool ReadedFully;
+    ulong BeginVersion;
+    uint BeginNAME;
+    ulong BeginFOLDINFO;
+    uint LengthFOLDINFO;
+    ulong BeginDATABASE;
+    uint LengthDATABASE;
+    ulong BeginFOLDWMAN;
+    uint LengthFOLDWMAN;
 
+    uint DataBaseChunkSize;
+    ulong BeginDataBaseChunkSize;
+
+    QVector<ulong> BeginPlayerDiffirences;
+    QMap<ulong, uint> FOLDGPLYz;
+    QMap<ulong, uint> DATAINFOz;
+    QList<Player *> Players;
     QList<GameAction *> Actions;
 
-    long BeginVersion;
-
-    int BeginNAME;
-    long BeginFOLDINFO;
-    int LengthFOLDINFO;
-
-    long BeginDATABASE;
-    int LengthDATABASE;
-
-    long BeginFOLDWMAN;
-    int LengthFOLDWMAN;
-
-    int DataBaseChunkSize;
-    long BeginDataBaseChunkSize;
-
-    QVector<long> BeginFOLDGPLYz;
-    QVector<long> BeginPlayerDiffirences;
-    QMap<long, int> BeginPlayersChunkDataSizes;
-
+    QString fileName;
     QString Name;
-    int Duration;
+    uint Duration;
+    uint Slots;
+    long PlayerStart;
     int PlayerCount;
-    int MapSize;
+    uint TeamsCount;
+    uint MapSize;
     QString MapLocale;
     QString Map;
+    uint MapCRC32;
     int Version;
     QString MOD;
     long ActionDBSize;
-    int TotalTicks;
-
-    int Slots;
-
-    long ActionStart;
-    long PlayerStart;
-
-    WinConditions *conditions;
-    QList<Player *> Players;
-    GameSettings *settings;
-
-    int TeamsCount;
-
-    int ActionCount;
-    QString FullFileName;
-
-    bool IsSteam;
-
-    bool Is_1_2_Version;
-
-    QString BuildName;
-    QString ConditionsQString;
-
-//    bool HasException;
-
-    int GetPlayerMidApm(int id);
-
-    bool IsAnyAverageAPMAbove(int apm);
-
-    bool getIsSteam() const;
-    bool getIs_1_2_Version() const;
-    QString getBuildName() const;
-    QString getConditionsQString() const;
-    int getTeamsCount() const;
-    QString getFullFileName() const;
-    void setFullFileName(const QString &value);
-    int getActionCount() const;
-    void setActionCount(int value);
-    long getActionStart() const;
-    void setActionStart(long value);
-    long getPlayerStart() const;
-    void setPlayerStart(long value);
-    int getSlots() const;
-    void setSlots(int value);
-    int getTotalTicks() const;
-    void setTotalTicks(int value);
-    long getActionDBSize() const;
-    void setActionDBSize(long value);
-    QString getMOD() const;
-    void setMOD(const QString &value);
-    int getVersion() const;
-    void setVersion(int value);
-
-    QString getShortMapName();
-    QString getMap() const;
-    void setMap(const QString &value);
-
-    int getMapSize() const;
-    void setMapSize(int value);
-
-    int getPlayerCount() const;
-    void setPlayerCount(int value);
-
-    QString getName() const;
-    void setName(const QString &value);
-
-    int getDataBaseChunkSize() const;
-    void setDataBaseChunkSize(int value);
-
-    long getBeginDataBaseChunkSize() const;
-    void setBeginDataBaseChunkSize(long value);
-
-    int getLengthFOLDWMAN() const;
-    void setLengthFOLDWMAN(int value);
-
-    long getBeginFOLDWMAN() const;
-    void setBeginFOLDWMAN(long value);
-
-    int getLengthDATABASE() const;
-    void setLengthDATABASE(int value);
-
-    long getBeginDATABASE() const;
-    void setBeginDATABASE(long value);
-
-    int getLengthFOLDINFO() const;
-    void setLengthFOLDINFO(int value);
-
-    long getBeginFOLDINFO() const;
-    void setBeginFOLDINFO(long value);
-
-    int getBeginNAME() const;
-    void setBeginNAME(int value);
-
-    long getBeginVersion() const;
-    void setBeginVersion(long value);
-
-    bool getReadedFully() const;
-    void setReadedFully(bool value);
-
-    QString getHash() const;
-    void setHash(const QString &value);
-
-    QString getMapLocale() const;
-    void setMapLocale(const QString &value);
+    uint TotalTicks;
+    ulong ActionStart;
+    uint ActionCount;
 };
 
 #endif // Replay_H

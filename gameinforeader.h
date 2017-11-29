@@ -29,20 +29,27 @@ public:
 
     void init(QString path, QString SID, QString name);
     void reset();
-    QString read_warnings_log(QString str, int offset=0, int count=1);
+    QString read_warnings_log(QString str, int offset, int count=1);
+    int read_warnings_log(QString str);
     QString get_cur_profile_dir();
     QString find_profile();
     QString get_playback_name() const;
     QString get_last_invalid_map() const;
     QString get_game_stats() const;
-    QStringList get_players();
+    QStringList get_players(bool with_mates = false);
     QByteArray get_playback_file();
+    bool is_game_restarted();
     bool is_map_valid();
+    bool is_mod_changed();
+    bool is_playback_error();
     void get_error_debug(int e_code);
     int read_game_info(QMap<QString, QString> *sids, long totalActions);
-    int readySend();
+    int readySend(bool debug=false);
 
     QString cur_profile_folder;
+
+    QString getSender_name() const;
+    void setSender_name(const QString &value);
 
 private:
     int search_info(long totalActions);
@@ -51,9 +58,11 @@ private:
     QString playback_name;
     QString sender_steamID;
     QString sender_name;
+    QString current_mod;
     QString last_invalid_map;
     QStringList errors_list;
     QByteArray _playback;
+    QDateTime soulstorm_start_dt;
 
     bool is_playback;
     bool stopgame_valid;
@@ -62,12 +71,11 @@ private:
     int last_playback;
     int last_startgame;
     int last_stopgame;
-    int last_ending_mission;
     int playback_error;
     int average_apm;
     int error_code;
     long TotalActions;
-
+    int current_mod_index;
 };
 
 #endif // GameInfoReader_H

@@ -58,10 +58,10 @@ void APMMeter::start()
     measure->resetAllAPM();
 
     timerId = SetTimer(NULL, 0, MEASURE_CYCLE_LENGTH-10, NULL);
-    qDebug() << "meter started";
+    qDebug() << "APMMeter started";
     max = 0;
     calc_max = false;
-    MSG msg = {0};
+    MSG msg = MSG();
     while(!stopped)
     {
         // получаем сообщение
@@ -84,7 +84,7 @@ void APMMeter::start()
         DispatchMessage(&msg);
     }
 
-    qDebug() << "meter stopped";
+    qDebug() << "APMMeter stopped";
     KillTimer(NULL, timerId);
 }
 
@@ -98,7 +98,7 @@ long APMMeter::getTotalActions()
     return measure->getTotalActions();
 }
 
-long APMMeter::getTime()
+DWORD APMMeter::getTime()
 {
     return measure->getTime();
 }

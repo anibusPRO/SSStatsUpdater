@@ -3,6 +3,7 @@
 #include <QNetworkRequest>
 #include <QStringList>
 #include <QDebug>
+//#include <QUrlQuery>
 
 Request::Request(QString address /*= QString()*/)
 {
@@ -22,6 +23,7 @@ QString Request::address() const
 void Request::setAddress(QString address)
 {
     QUrl u(address, QUrl::StrictMode);
+//    QUrlQuery u(address);
     for (QPair<QString, QString> value : u.queryItems())
         addParam(value.first, value.second);
 //        for (QPair<QString, QString> value : QUrlQuery(QUrl(address)).queryItems())
@@ -72,8 +74,10 @@ QMap<QString, QString> Request::params() const
 
 QUrl Request::url(bool forGetRequest /*= true*/) const
 {
-    QUrl url(address(), QUrl::StrictMode);
+//    QUrl url(address(), QUrl::StrictMode);
+    QUrl url(address());
     if (forGetRequest)
+//        url.setQuery(data(forGetRequest), QUrl::StrictMode);
         url.setEncodedQuery(data(forGetRequest));
 //            url.setQuery(data());
     return url;

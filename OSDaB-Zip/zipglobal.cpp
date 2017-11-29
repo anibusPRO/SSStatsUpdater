@@ -26,7 +26,7 @@
 **********************************************************************/
 
 #include "zipglobal.h"
-
+#include <QDebug>
 #if defined(Q_OS_WIN) || defined(Q_OS_WINCE) || defined(Q_OS_LINUX) || defined (Q_OS_MACX)
 #define OSDAB_ZIP_HAS_UTC
 #include <ctime>
@@ -115,9 +115,18 @@ bool OSDAB_ZIP_MANGLE(setFileTimestamp)(const QString& fileName, const QDateTime
         return true;
 
 #ifdef Q_OS_WIN
+//    HANDLE hFile = CreateFile(fileName.toStdWString().c_str(),
+//                              GENERIC_WRITE, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+//    while(hFile == INVALID_HANDLE_VALUE){
+//        qDebug() << fileName << "INVALID_HANDLE_VALUE" << GetLastError();
+//        Sleep(1000);
+//        hFile = CreateFile(fileName.toStdWString().c_str(),
+//            GENERIC_WRITE, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+//    }
     HANDLE hFile = CreateFile(fileName.toStdWString().c_str(),
         GENERIC_WRITE, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
     if (hFile == INVALID_HANDLE_VALUE) {
+        qDebug() << fileName << "INVALID_HANDLE_VALUE" << GetLastError();
         return false;
     }
 
@@ -138,6 +147,7 @@ bool OSDAB_ZIP_MANGLE(setFileTimestamp)(const QString& fileName, const QDateTime
 
     const bool success = SetFileTime(hFile, NULL, NULL, &ftLastMod);
     CloseHandle(hFile);
+//    qDebug() << fileName << "SetFileTime" << success;
     return success;
 
 #elif defined(Q_OS_LINUX) || defined(Q_OS_MACX)

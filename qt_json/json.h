@@ -122,6 +122,10 @@ namespace QtJson {
             return parse(array, "json").toMap();
     #endif
     }
+    inline QVariantList json_to_list(QByteArray array)
+    {
+        return parse(array, "json").toList();
+    }
 
 }
 #endif //JSON_H

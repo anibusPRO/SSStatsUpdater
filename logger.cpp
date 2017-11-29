@@ -1,5 +1,6 @@
 #include "logger.h"
 #include <QDebug>
+#include <QMutex>
 
 // Типы сообщений
 static const char* msgType[] =
@@ -13,12 +14,14 @@ static const char* msgType[] =
 // Данные для ведения логов
 static QTextStream* logStream;
 static QFile* logFile;
+
+QMutex	m_mutex;
 // Вывод логов в файл
+//void customMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 void customMessageHandler(QtMsgType type, const char* msg);
 
 Logger::Logger()
 {
-
 }
 
 Logger::~Logger()
@@ -26,29 +29,25 @@ Logger::~Logger()
 
 }
 
-
+//void customMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 void customMessageHandler(QtMsgType type, const char* msg)
 {
+    m_mutex.lock();
     std::cout << msgType[type] << msg << std::endl;
     if(logStream && logStream->device())
     {
         *logStream << msgType[type] << QDateTime::currentDateTime().toString("hh:mm:ss.zzz ") << QString::fromLocal8Bit(msg) << endl;
     }
+    m_mutex.unlock();
 }
 
-void Logger::installLog()
+void Logger::installLog(QString fileName)
 {
-    logFile = new QFile("stats.log");
+    logFile = new QFile(fileName);
     if(logFile->open(QIODevice::WriteOnly | QIODevice::Unbuffered))
     logStream = new QTextStream(logFile);
-
-//    #ifdef Q_WS_WIN
-//    logStream->setCodec("Windows-1251");
     logStream->setCodec("utf-8");
-    // Под остальными ОС - utf8
-//    #else
-//    logStream->setCodec("utf-8");
-//    #endif
+    logStream->setGenerateByteOrderMark(true);
 
     // Запись заголовка с информацией о запуске
     if(logStream && logStream->device())
@@ -57,12 +56,23 @@ void Logger::installLog()
         *logStream << QString("Markers: (II) informational, (WW) warning,") << endl;
         *logStream << QString("(EE) error, (FF) fatal error.") << endl;
         *logStream << getOSInfo() << endl;
-        *logStream << QString("Runned at %1.").arg(QDateTime::currentDateTime().toString()) << endl << endl;
+        *logStream << QString("Runned at %1.").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss")) << endl << endl;
     }
 
     qInstallMsgHandler(customMessageHandler);
-
+//    qInstallMessageHandler(customMessageHandler);
     qDebug("Success opening log file");
+}
+
+void Logger::clearLog()
+{
+    logFile->resize(log_size);
+    logFile->seek(log_size);
+}
+
+void Logger::updateSize(){
+    log_size = logFile->size();
+    qDebug() << "log size:" << log_size;
 }
 
 void Logger::finishLog()
@@ -75,6 +85,7 @@ void Logger::finishLog()
     logFile = 0;
 
     qInstallMsgHandler(0);
+//    qInstallMessageHandler(0);
 }
 
 QString Logger::getOSInfo()
