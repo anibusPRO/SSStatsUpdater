@@ -1,30 +1,18 @@
 QT       += core gui network
-CONFIG += console
+CONFIG -= console
 CONFIG += debug
-#CONFIG += qxt
-#QXT += core gui
 
 QMAKE_CXXFLAGS += -std=c++11
-
-#QMAKE_EXTRA_TARGETS += before_build makefilehook
-#makefilehook.target = $(MAKEFILE)
-#makefilehook.depends = .beforebuild
-#PRE_TARGETDEPS += .beforebuild
-#before_build.target = .beforebuild
-#before_build.depends = FORCE
-#before_build.commands = chcp 65001
-
-#DEFINES  += QT_NO_SSL
 TEMPLATE = app
-#TEMPLATE = lib
-#CONFIG += static
-#DEFINES += BOOST_NO_EXCEPTIONS
+
 
 TARGET = SSStats
 
 PROJECT_PATH = "C:/OpenServer/domains/dowstats.loc/ssstats"
-#DESTDIR      = $$PROJECT_PATH
-
+DESTDIR      = $$PROJECT_PATH
+target.path = "C:/Program Files (x86)/Steam/steamapps/common/Dawn of War Soulstorm"
+target.files = $$DESTDIR/SSStats.exe
+INSTALLS += target
 RC_FILE = ssstats.rc
 INCLUDEPATH += C:/boost/include/boost-1_63
 
@@ -83,7 +71,7 @@ LIBS += -lpsapi
 
 include(C:/Programming/SSStats/qt_json/qt_json.pri)
 
-win32 {
-    WINSDK_DIR = C:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
-    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/x64/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
-}
+#win32 {
+#    WINSDK_DIR = C:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
+#    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/x64/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
+#}

@@ -73,6 +73,50 @@ bool systemWin32::CloseProcessMainThread(DWORD dwProcID)
   return (0 != dwMainThreadID);
 }
 
+DWORD systemWin32::getProcessMainThreadHandle(DWORD dwProcID)
+{
+  DWORD dwMainThreadID = 0;
+  ULONGLONG ullMinCreateTime = MAXULONGLONG;
+
+  HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+  if (hThreadSnap != INVALID_HANDLE_VALUE) {
+    THREADENTRY32 th32;
+    th32.dwSize = sizeof(THREADENTRY32);
+    BOOL bOK = TRUE;
+    for (bOK = Thread32First(hThreadSnap, &th32); bOK;
+         bOK = Thread32Next(hThreadSnap, &th32)) {
+      if (th32.th32OwnerProcessID == dwProcID) {
+        HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION,
+                                    TRUE, th32.th32ThreadID);
+        if (hThread) {
+          FILETIME afTimes[4] = {FILETIME()};
+          if (GetThreadTimes(hThread,
+                             &afTimes[0], &afTimes[1], &afTimes[2], &afTimes[3])) {
+            ULONGLONG ullTest = MAKEULONGLONG(afTimes[0].dwLowDateTime,
+                                              afTimes[0].dwHighDateTime);
+            if (ullTest && ullTest < ullMinCreateTime) {
+              ullMinCreateTime = ullTest;
+              dwMainThreadID = th32.th32ThreadID; // let it be main... :)
+            }
+          }else
+            qDebug() << "GetThreadTimes: Error" << GetLastError();
+          CloseHandle(hThread);
+        }else
+            qDebug() << "OpenThread: Error" << GetLastError();
+      }
+    }
+#ifndef UNDER_CE
+    CloseHandle(hThreadSnap);
+#else
+    CloseToolhelp32Snapshot(hThreadSnap);
+#endif
+  }
+  else
+      qDebug() << "CreateToolhelp32Snapshot: Error" << GetLastError();
+
+  return dwMainThreadID;
+}
+
 void systemWin32::updateProcessList()
 {
     win32sysMap.clear();

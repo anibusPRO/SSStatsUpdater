@@ -38,7 +38,7 @@ public:
     void setMaxWaitTime(qint64 max);
     qint64 maxWaitTime() const;
     RequestError error() const;
-
+    void setUserAgent(QString agent);
 private:
     QByteArray sendRequest(Request& request, bool getRequest = true);
     QByteArray sendWhileSuccess(Request& request, int maxCount = 2, bool getRequest = true);
@@ -47,6 +47,7 @@ private:
     QNetworkProxy _proxy;
     QNetworkAccessManager* m_manager;
     QSignalMapper m_mapper;
+    QString _userAgent;
 
 public slots:
     void updateProgress(qint64 bytesSent, qint64 bytesTotal);

@@ -15,11 +15,9 @@
 #include "vdf_parser.hpp"
 #include "OSDaB-Zip/unzip.h"
 #include <QUrl>
-//#include <QAbstractEventDispatcher>
-//#include <QtDebug>
-//#include <QVector>
-//#include <qt_windows.h>
-
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <psapi.h>
 
 using namespace tyti;
 
@@ -35,6 +33,7 @@ BYTE tempHT[4] = {0};
 StatsCollector::StatsCollector(QObject *parent) :
     QObject(parent)
 {
+    haveModuleInfo = false;
     curFog = false;
     curHP = false;
     log.installLog("stats.log");
@@ -60,6 +59,7 @@ StatsCollector::StatsCollector(QObject *parent) :
         lpSharedMemory->showMenu = false;
         lpSharedMemory->showRaces = false;
         lpSharedMemory->showAPM = false;
+        lpSharedMemory->sidsAddrLock = false;
     }
     else
         qDebug() << "MapViewOfFile: Error" << GetLastError();
@@ -85,7 +85,6 @@ bool StatsCollector::start()
     server_addr = settings.value("info/serverAddr", "http://www.dowstats.h1n.ru/").toString();
     qDebug() << "Server:" << server_addr << "Version:" << version;
     enableStats = settings.value("settings/enableStats", true).toBool();
-//    closeWithGame = settings.value("settings/closeWithGame", false).toBool();
     enableDXHook = false;
     if(lpSharedMemory){
         lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
@@ -94,6 +93,7 @@ bool StatsCollector::start()
             lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
             lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
             lpSharedMemory->version = version.toInt();
+            lpSharedMemory->statsThrId = GetCurrentThreadId();
         }
     }
     if(!enableStats) qDebug() << "STATS DISABLED";
@@ -111,30 +111,21 @@ bool StatsCollector::start()
         connect(apmShortcut, SIGNAL(activated()), this, SLOT(toggleAPMVisibility()));
     } else qDebug() << "DXHOOK DISABLED";
 
-    int exitCode = QProcess::execute("ping", {"-n", "1", "8.8.8.8"});
-    while(exitCode!=0)
-    {
-        qDebug() << "No internet connection available";
+    QNetworkAccessManager nam;
+    QNetworkRequest req(QUrl("http://www.google.com"));
+    QNetworkReply *reply = nam.get(req);
+    QEventLoop loop;
+    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+    loop.exec();
+    while(!reply->bytesAvailable()){
+        qDebug() << "Player are not connected to the internet";
         Sleep(5000);
         QCoreApplication::processEvents();
-        exitCode = QProcess::execute("ping", {"-n", "1", "8.8.8.8"});
+        reply = nam.get(req);
+        connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+        loop.exec();
     }
-//    QString global_version = QString::fromUtf8(sender->get(server_addr+"/update.php?key="+QLatin1String(SERVER_KEY)+"&").data());
-//    global_version = global_version.remove('\n').remove('\r');
-//    qDebug() << "global version:" << global_version;
-
-
-//    if(version.toInt()<global_version.toInt()){
-//        QProcess updater_proc;
-//        if(updater_proc.startDetached("SSStatsUpdater.exe"))
-//        {
-//            qDebug() << "SSStatsUpdater started successfully";
-//            return false;
-//        }
-//        else
-//            qDebug() << "SSStatsUpdater failed to start";
-//    }
-
+    qDebug() << "Player are connected to the internet";
     if(init_player())
         qDebug() << "Player initialization successfull";
     else{
@@ -221,10 +212,6 @@ void StatsCollector::check_game()
             // игра не завершилась
             case 1:
                 qDebug() << "Game Start" << game_state;
-//                if(reader->is_game_restarted()){
-//                    check_name();
-//                    processFlags(true);
-//                }
                 if(enableDXHook){
                     lpSharedMemory->showMenu = false;
                     if(showRaces){
@@ -239,9 +226,6 @@ void StatsCollector::check_game()
                             showRacesTimer.setSingleShot(true);
                             showRacesTimer.start(25000);
                             connect(&showRacesTimer, SIGNAL(timeout()), this, SLOT(toggleRacesVisibility()));
-//                            Sleep(25000);
-//                            lpSharedMemory->showRaces = false;
-
                         }else{
                             qDebug() << "Player is observer";
                             isObserver = true;
@@ -282,17 +266,7 @@ void StatsCollector::check_game()
             // игра - просмотр реплея
             case 2:
                 qDebug() << "Game Start Playback";
-//                if(reader->is_game_restarted())
-//                    processFlags(true);
                 if(enableDXHook) lpSharedMemory->showMenu = false;
-//                while(procIsActive&&game_state!=0){
-//                    procIsActive = systemWin32::findProcessByWindowName("Dawn of War: Soulstorm");
-//                    Sleep(5000);
-//                    QCoreApplication::processEvents();
-//                    game_state = reader->readySend();
-//                }
-//                qDebug() << "Game Stop" << game_state << procIsActive;
-//                lpSharedMemory->showMenu = showMenu;
                 break;
 
             default:
@@ -309,22 +283,19 @@ void StatsCollector::check_game()
             lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
             lpSharedMemory->showAPM   = showAPM   = settings.value("settings/showAPM", true).toBool();
 
-//            // проверим валидность карты
-//            if(!reader->is_map_valid())
-//                download_map(reader->get_last_invalid_map());
             if(reader->is_game_restarted()){
                 check_name();
                 processFlags(true);
             }
             GetSteamPlayersInfo();
         }else{
-            AllPlayersInfo.clear();
-            reader->reset();
             closeWithGame = settings.value("settings/closeWithGame", false).toBool();
             if(closeWithGame){
                 qDebug() << "closeWithGame";
                 QCoreApplication::quit();
             }
+            AllPlayersInfo.clear();
+            reader->reset();
         }
     }
 }
@@ -600,7 +571,6 @@ void StatsCollector::register_player(QString name, QString sid, bool init)
 {
     QByteArray enc_name = QUrl::toPercentEncoding(name,""," ");
     QString reg_url = server_addr+"/regplayer.php?name="+enc_name+"&sid="+sid+"&version="+version+"&sender_sid="+sender_steamID+"&";
-//    qDebug() << reg_url;
     if(init) reg_url += "init=true&";
     reg_url += "key="+QLatin1String(SERVER_KEY)+"&";
     emit GET_REQUEST(reg_url);
@@ -644,6 +614,7 @@ StatsCollector::~StatsCollector()
 
 int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
 
+//    addresses.clear();
     PlayersInfo.clear();
     HWND hWnd = FindWindow(NULL, L"Dawn of War: Soulstorm");
     DWORD PID;
@@ -659,90 +630,180 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
         qDebug() << "OpenProcess Error" << GetLastError();
         return GetLastError();
     }
-    long ptr1Count = 0x00000000; // адресс после недоступной зоны
-    MEMORY_BASIC_INFORMATION mbi; // Объявляем структуру
-    LPCVOID ptr1 = (LPCVOID)ptr1Count;
 
-
-    // можно собрать статистику о памяти в которой идет поиск
-    // и на ее основе улучшить критерии отбора.
-    int counter = 1;
-//    SIZE_T total_size = 0;
-    QByteArray buffer(30400, 0);
-    while (ptr1Count <= 0x7FFE0000) // До конца виртуальной памяти для данного процесса
-    {
-        VirtualQueryEx(hProcess, ptr1, &mbi, sizeof(mbi));
-
-        if(mbi.State==MEM_COMMIT&&
-            mbi.AllocationProtect==PAGE_READWRITE&&
-            mbi.Protect==PAGE_READWRITE&&
-            mbi.Type==MEM_PRIVATE&&
-            0x1000<=mbi.RegionSize&&mbi.RegionSize<0xFFF000)
+    if(!haveModuleInfo){
+        HANDLE hthSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, PID);
+        if (hthSnapshot!=INVALID_HANDLE_VALUE)
         {
-//            total_size += mbi.RegionSize;
-
-            for (PCHAR readAddr = (PCHAR)mbi.BaseAddress; readAddr < (PCHAR)mbi.BaseAddress+mbi.RegionSize; readAddr += buffer.size() - 200) {
-                SIZE_T bytesRead = 0;
-
-                // если функция вернула не ноль, то продолжим цикл
-                if(!ReadProcessMemory(hProcess, (PVOID)readAddr, (PVOID)buffer.data(), buffer.size(), &bytesRead))
+            MODULEENTRY32 me = { sizeof(me) };
+            Module32First(hthSnapshot, &me);
+            do moduleInfo.insert((DWORD)me.modBaseAddr, (DWORD)me.modBaseSize);
+            while(Module32Next(hthSnapshot, &me));
+            CloseHandle(hthSnapshot);
+            haveModuleInfo = true;
+        }
+    }
+    QByteArray buffer(30400, 0);
+    for(int i=0; i<10; ++i){
+        lpSharedMemory->sidsAddrLock = true;
+//        for (PVOID readAddr = lpSharedMemory->sidsAddr[i]; readAddr < lpSharedMemory->sidsAddr[i]+0x23000; readAddr += buffer.size() - 200) {
+            PVOID readAddr;
+//            if(i>9)
+//                readAddr = (PVOID)*(lpSharedMemory->sidsAddr[i-10]);
+//            else
+            readAddr = lpSharedMemory->sidsAddr[i];
+            qDebug() << readAddr;
+            SIZE_T bytesRead = 0;
+            // если функция вернула не ноль, то продолжим цикл
+            if(!ReadProcessMemory(hProcess, readAddr, (PVOID)buffer.data(), buffer.size(), &bytesRead))
+                continue;
+//            int zero_counter=0;
+            for (uint i = 0; i < bytesRead - 200; i++) {
+                bool match = false;
+//                if(buffer[i]==0){
+//                    ++zero_counter;
+//                    if(zero_counter==16) break;
+//                }else zero_counter=0;
+                for (uint j = 0; j < sizeof(steamHeader); j++)
+                    if (buffer[i + j] != steamHeader[j]){
+                        match = false;
+                        break;
+                    }else match = true;
+                if (!match)
                     continue;
-                if(bytesRead<200)
-                    continue;
-                for (uint i = 0; i < bytesRead - 200; i++) {
-                    bool match = false;
-                    for (uint j = 0; j < sizeof(steamHeader); j++)
-                        if (buffer[i + j] != static_cast<char>(steamHeader[j])){
-                            match = false;
-                            break;
-                        }else match = true;
-
-                    if (!match)
+                int nickPos = i + 56;
+                if (buffer[nickPos] < 50 &&
+                    buffer[nickPos] > 0 &&
+                    buffer[nickPos + 1] == 0 &&
+                    buffer[nickPos + 2] == 0 &&
+                    buffer[nickPos + 3] == 0 &&
+                    buffer[nickPos - 1] == 0 &&
+                    buffer[nickPos - 2] == 0 &&
+                    buffer[nickPos - 3] == 0 &&
+                    buffer[nickPos - 4] == 0 &&
+                    buffer[nickPos+4+buffer[nickPos]*2]   == 0 &&
+                    buffer[nickPos+4+buffer[nickPos]*2+1] == 0 &&
+                    buffer[nickPos+4+buffer[nickPos]*2+2] == 0 &&
+                    buffer[nickPos+4+buffer[nickPos]*2+3] == 0) {
+                    QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
+                    if(!steamIdStr.contains(QRegExp("^[0-9]{17}$"))){
+//                            qDebug() << mbi.BaseAddress << (PVOID)(readAddr+i) << (PVOID)mbi.RegionSize << steamIdStr << "false";
+//                            qDebug() << (readAddr+i) << steamIdStr << "false";
                         continue;
-
-                    int nickPos = i + 56;
-                    if (buffer[nickPos] < static_cast<char>(50) &&
-                        buffer[nickPos] > '0' &&
-                        buffer[nickPos + 1] == '0' &&
-                        buffer[nickPos + 2] == '0' &&
-                        buffer[nickPos + 3] == '0' &&
-                        buffer[nickPos - 1] == '0' &&
-                        buffer[nickPos - 2] == '0' &&
-                        buffer[nickPos - 3] == '0' &&
-                        buffer[nickPos - 4] == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2]   == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2+1] == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2+2] == '0' &&
-                        buffer[nickPos+4+buffer[nickPos]*2+3] == '0') {
-                        QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
-
-                        if(!steamIdStr.contains(QRegExp("^[0-9]{17}$")))
-                            continue;
-
+                    }
+                    if(get_stats&&!PlayersInfo.contains(steamIdStr)){
+//                            PlayersInfo.insert(steamIdStr, nick);
+//                            qDebug() << mbi.BaseAddress << (PVOID)(readAddr+i) << (PVOID)mbi.RegionSize << steamIdStr << "true";
+//                            qDebug() << (readAddr+i) << steamIdStr << "true";
+                        PlayersInfo.append(steamIdStr);
+                    }
+                    if(!AllPlayersInfo.contains(steamIdStr)){
                         QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer[nickPos] * 2).data()).left(buffer[nickPos]);
-                        if(get_stats&&!PlayersInfo.contains(steamIdStr)){
-//                            qDebug() << steamIdStr << nick;
-                            PlayersInfo.insert(steamIdStr, nick);
-                        }
-                        if(!AllPlayersInfo.contains(steamIdStr))
-                            AllPlayersInfo.insert(steamIdStr, nick);
+                        AllPlayersInfo.insert(steamIdStr, nick);
                     }
                 }
             }
-        }
-        ptr1Count = ptr1Count + (int)mbi.RegionSize;
-        ptr1 = (PVOID)ptr1Count;
-        ++counter;
+//        }
     }
+//    lpSharedMemory->sidsAddr.clear();
+    lpSharedMemory->sidsAddrLock = false;
+//    long ptr1Count = 0x00000000; // адресс после недоступной зоны
+//    MEMORY_BASIC_INFORMATION mbi; // Объявляем структуру
+//    LPCVOID ptr1 = (LPCVOID)ptr1Count;
+//    while (ptr1Count < 0x7FFF0000) // До конца виртуальной памяти для данного процесса
+//    {
+//        qDebug() << ptr1Count << (ptr1Count <= 0x7FFF0000);
+//        if(moduleInfo.keys().contains(ptr1Count)){
+//            qDebug() << (PVOID)ptr1Count << (PVOID)moduleInfo.value(ptr1Count);
+//            ptr1Count = ptr1Count + moduleInfo.value(ptr1Count);
+//            ptr1 = (PVOID)ptr1Count;
+//            continue;
+//        }
+//        VirtualQueryEx(hProcess, ptr1, &mbi, sizeof(mbi));
+//        if(mbi.Type==MEM_PRIVATE&&
+//            mbi.AllocationProtect==PAGE_READWRITE&&
+//            mbi.Protect==PAGE_READWRITE&&
+//            mbi.State==MEM_COMMIT&&mbi.RegionSize<0xFFF000)
+//        {
+//    while (ptr1Count < 0x7FFF0000) // До конца виртуальной памяти для данного процесса
+//    {
+//        qDebug() << ptr1Count << (ptr1Count <= 0x7FFF0000);
+//        if(moduleInfo.keys().contains(ptr1Count)){
+//            qDebug() << (PVOID)ptr1Count << (PVOID)moduleInfo.value(ptr1Count);
+//            ptr1Count = ptr1Count + moduleInfo.value(ptr1Count);
+//            ptr1 = (PVOID)ptr1Count;
+//            continue;
+//        }
+
+//        VirtualQueryEx(hProcess, ptr1, &mbi, sizeof(mbi));
+//        if(mbi.Type==MEM_PRIVATE&&
+//            mbi.AllocationProtect==PAGE_READWRITE&&
+//            mbi.Protect==PAGE_READWRITE&&
+//            mbi.State==MEM_COMMIT&&mbi.RegionSize<0xFFF000)
+//        {
+//            for (PCHAR readAddr = (PCHAR)mbi.BaseAddress; readAddr < (PCHAR)mbi.BaseAddress+mbi.RegionSize; readAddr += buffer.size() - 200) {
+//                SIZE_T bytesRead = 0;
+//                if(!ReadProcessMemory(hProcess, (PVOID)readAddr, (PVOID)buffer.data(), buffer.size(), &bytesRead))
+//                    continue;
+//                for (uint i = 0; i < bytesRead - 200; i++) {
+//                    bool match = false;
+//                    for (uint j = 0; j < sizeof(steamHeader); j++)
+//                        if (buffer[i + j] != steamHeader[j]){
+//                            match = false;
+//                            break;
+//                        }else match = true;
+//                    if (!match)continue;
+//                    int nickPos = i + 56;
+//                    if (buffer[nickPos] < 50 &&
+//                        buffer[nickPos] > 0 &&
+//                        buffer[nickPos + 1] == 0 &&
+//                        buffer[nickPos + 2] == 0 &&
+//                        buffer[nickPos + 3] == 0 &&
+//                        buffer[nickPos - 1] == 0 &&
+//                        buffer[nickPos - 2] == 0 &&
+//                        buffer[nickPos - 3] == 0 &&
+//                        buffer[nickPos - 4] == 0 &&
+//                        buffer[nickPos+4+buffer[nickPos]*2]   == 0 &&
+//                        buffer[nickPos+4+buffer[nickPos]*2+1] == 0 &&
+//                        buffer[nickPos+4+buffer[nickPos]*2+2] == 0 &&
+//                        buffer[nickPos+4+buffer[nickPos]*2+3] == 0) {
+//                        QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
+//                        if(!steamIdStr.contains(QRegExp("^[0-9]{17}$"))){
+//                            qDebug() << (PVOID)(readAddr+i) << steamIdStr << "false";
+//                            continue;
+//                        }
+//                        if(get_stats&&!PlayersInfo.contains(steamIdStr)){
+//                            PlayersInfo.append(steamIdStr);
+//                            qDebug() << (PVOID)(readAddr+i);
+//                        }
+//                        if(!AllPlayersInfo.contains(steamIdStr)){
+//                            QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer[nickPos] * 2).data()).left(buffer[nickPos]);
+//                            AllPlayersInfo.insert(steamIdStr, nick);
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        ptr1Count = ptr1Count + (int)mbi.RegionSize;
+//        ptr1 = (PVOID)ptr1Count;
+//    }
+
+//    qSort(addresses);
+//    foreach(LPVOID addr, addresses)
+//        qDebug() << addr;
+//    foreach(LPVOID addr, addresses_finded)
+//        qDebug() << "addresses_finded" << addr;
 
     if(!PlayersInfo.isEmpty()&&get_stats){
-        QString sids = QStringList(PlayersInfo.keys()).join(",");
+//        qDebug() << PlayersInfo;
+        if(!PlayersInfo.contains(sender_steamID))
+            PlayersInfo.append(sender_steamID);
+        QString sids = PlayersInfo.join(",");
         Request test_request{server_addr+"/stats.php?key="+QLatin1String(SERVER_KEY)+"&sids="+sids+"&version="+version+"&sender_sid="+sender_steamID+"&"};
 //        qDebug() << test_request.address();
         QByteArray reply = sender->get(test_request);
 
         if(enableDXHook){
-//            qDebug() << reply;
             QVariantList players_info = QtJson::json_to_list(reply);
             int i = 0;
             foreach(QVariant item, players_info){
@@ -756,18 +817,14 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
                     lpSharedMemory->lobbyPlayers[i].winsCount = tempMap.value("winsCount", 0).toInt();
                     lpSharedMemory->lobbyPlayers[i].winRate = tempMap.value("winRate", 0).toInt();
                     lpSharedMemory->lobbyPlayers[i].mmr = tempMap.value("mmr", 0).toInt();
+                    lpSharedMemory->lobbyPlayers[i].mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
                     lpSharedMemory->lobbyPlayers[i].apm = tempMap.value("apm", 0).toDouble();
-//                    qDebug() << lpSharedMemory->lobbyPlayers[i].apm << i;
                     ++i;
                 }
-
             }
             if(i)lpSharedMemory->playersNumber = i;
         }
     }
-
-//    DWORD mem_size = total_size/1024/1024;
-//    qDebug() << "Total memory size:" << mem_size << "mb";
     CloseHandle(hProcess);
     return 0;
 }

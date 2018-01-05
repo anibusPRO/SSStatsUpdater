@@ -15,7 +15,7 @@ void RequestSender::map(QNetworkReply *reply)
 
 RequestSender::RequestSender(qint64 maxWaitTime /*= 35000*/, QObject *parent) : QObject{parent}
 {
-    setMaxWaitTime(maxWaitTime);
+    _maxWaitTime = maxWaitTime;
     _error = NoError;
     m_manager = new QNetworkAccessManager(this);
     connect(m_manager, SIGNAL(finished(QNetworkReply*)), SLOT(map(QNetworkReply*)));
@@ -120,6 +120,10 @@ void RequestSender::setMaxWaitTime(qint64 max)
 {
     _maxWaitTime = max;
 }
+void RequestSender::setUserAgent(QString agent)
+{
+    _userAgent = agent;
+}
 
 qint64 RequestSender::maxWaitTime() const
 {
@@ -140,7 +144,7 @@ QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true
     QNetworkRequest req;
 
     req = request.request(getRequest);
-    req.setRawHeader("User-Agent", "SSStats");
+    req.setRawHeader("User-Agent", _userAgent.toUtf8());
     QNetworkReply* reply = getRequest ?
                     manager->get(req) :
                     manager->post(req, request.data(getRequest));
@@ -210,7 +214,7 @@ void RequestSender::GET_REQUEST(QString url, QString fileName)
     Request request;
     request.setAddress(url);
     QNetworkRequest req = request.request();
-    req.setRawHeader("User-Agent", "SSStats");
+    req.setRawHeader("User-Agent", _userAgent.toUtf8());
 
     auto reply = m_manager->get(req);
 
@@ -229,7 +233,7 @@ void RequestSender::POST_REQUEST(QString url, QString name, QString content, QBy
     request.setAddress(url);
     request.setFile(data,name,content);
     QNetworkRequest req = request.request(false);
-    req.setRawHeader("User-Agent", "SSStats");
+    req.setRawHeader("User-Agent", _userAgent.toUtf8());
 
     auto reply = m_manager->post(req, request.data(false));
     m_mapper.setMapping(reply, mapping);

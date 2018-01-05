@@ -20,6 +20,7 @@ typedef struct{
     int winsCount;
     int winRate;
     int mmr;
+    int mmr1v1;
     int apm;
 } TPlayer;
 
@@ -38,6 +39,10 @@ typedef struct{
     bool showMenu;
     bool showRaces;
     bool showAPM;
+    DWORD statsThrId;
+    PDWORD sidsAddr[10];
+    bool sidsAddrLock;
+//    QVector<PCHAR> sidsAddr;
 } TGameInfo;
 
 typedef TGameInfo *PGameInfo;
@@ -94,8 +99,13 @@ private:
     QDateTime cur_time;
     APMMeter apm_meter;
     BYTE steamHeader[18] =  { 0x18, 0x0, 0x0, 0x0, 0x2F, 0x0, 0x73, 0x0, 0x74, 0x0, 0x65, 0x0, 0x61, 0x0, 0x6D, 0x0, 0x2F, 0x0 };
-    QMap<QString, QString> PlayersInfo;
+//    QMap<QString, QString> PlayersInfo;
+    QStringList PlayersInfo;
     QMap<QString, QString> AllPlayersInfo;
+    bool haveModuleInfo;
+    QMap<DWORD, DWORD> moduleInfo;
+    QVector<LPVOID> addresses;
+    QVector<QString> addresses_finded;
     int log_size;
 
 signals:

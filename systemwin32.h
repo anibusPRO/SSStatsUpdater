@@ -33,7 +33,8 @@ public:
     DWORD getProcessID(QString name);
     DWORD getProcessIDByWindowName(QString name);
     QStringList getAllProcessList();
-    bool CloseProcessMainThread(DWORD dwProcID);
+    static bool CloseProcessMainThread(DWORD dwProcID);
+    static DWORD getProcessMainThreadHandle(DWORD dwProcID);
     bool closeProcessByName(QString name);
 private:
     QMap <DWORD, QString> win32sysMap;
