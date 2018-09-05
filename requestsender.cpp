@@ -204,11 +204,6 @@ QByteArray RequestSender::sendWhileSuccess(Request& request, int maxCount /*= 2*
     return answer;
 }
 
-void RequestSender::updateProgress(qint64 bytesSent, qint64 bytesTotal)
-{
-//    qDebug() << (int)(100*bytesSent/bytesTotal;
-}
-
 void RequestSender::GET_REQUEST(QString url, QString fileName)
 {
     Request request;
@@ -254,7 +249,8 @@ void RequestSender::slotFinished(QNetworkReply* pnr)
         QUrl newUrl = pnr->url().resolved(redirectionTarget.toUrl());
         QNetworkAccessManager *manager = pnr->manager();
         QNetworkRequest redirection(newUrl);
-        QNetworkReply *newReply = manager->get(redirection);
+//        QNetworkReply *newReply =
+        manager->get(redirection);
         pnr->deleteLater();
         return;
     }

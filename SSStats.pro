@@ -1,21 +1,21 @@
 QT       += core gui network
-CONFIG -= console
-CONFIG += debug
-
+#CONFIG += debug
+#CONFIG += qaxcontainer
+CONFIG += static
 QMAKE_CXXFLAGS += -std=c++11
 TEMPLATE = app
 
 
 TARGET = SSStats
 
-PROJECT_PATH = "C:/OpenServer/domains/dowstats.loc/ssstats"
+PROJECT_PATH = "E:/OpenServer/domains/dowstats.loc/ssstats"
 DESTDIR      = $$PROJECT_PATH
-target.path = "C:/Program Files (x86)/Steam/steamapps/common/Dawn of War Soulstorm"
+target.path = "E:/Program Files (x86)/Steam/steamapps/common/Dawn of War Soulstorm"
 target.files = $$DESTDIR/SSStats.exe
 INSTALLS += target
 RC_FILE = ssstats.rc
-INCLUDEPATH += C:/boost/include/boost-1_63
-
+INCLUDEPATH += E:/boost/include/boost-1_63
+#TYPELIBS = TunngleSniffer.tlb
 SOURCES += main.cpp \
         request.cpp \
         requestsender.cpp \
@@ -69,9 +69,9 @@ HEADERS += request.h \
 
 LIBS += -lpsapi
 
-include(C:/Programming/SSStats/qt_json/qt_json.pri)
+include(E:/Programming/SSStats/qt_json/qt_json.pri)
 
-#win32 {
-#    WINSDK_DIR = C:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
-#    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/x64/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
-#}
+win32 {
+    WINSDK_DIR = E:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
+    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
+}

@@ -42,7 +42,6 @@ typedef struct{
     DWORD statsThrId;
     PDWORD sidsAddr[10];
     bool sidsAddrLock;
-//    QVector<PCHAR> sidsAddr;
 } TGameInfo;
 
 typedef TGameInfo *PGameInfo;
@@ -85,6 +84,7 @@ private:
     bool showAPM;
     bool curFog;
     bool curHP;
+    bool gameGoing;
     QString version;
     QString ss_path;
     QCoreApplication *app;
@@ -99,14 +99,10 @@ private:
     QDateTime cur_time;
     APMMeter apm_meter;
     BYTE steamHeader[18] =  { 0x18, 0x0, 0x0, 0x0, 0x2F, 0x0, 0x73, 0x0, 0x74, 0x0, 0x65, 0x0, 0x61, 0x0, 0x6D, 0x0, 0x2F, 0x0 };
-//    QMap<QString, QString> PlayersInfo;
     QStringList PlayersInfo;
     QMap<QString, QString> AllPlayersInfo;
-    bool haveModuleInfo;
     QMap<DWORD, DWORD> moduleInfo;
-    QVector<LPVOID> addresses;
-    QVector<QString> addresses_finded;
-    int log_size;
+    bool useOldSIDSearch;
 
 signals:
     void start_apm_meter();
@@ -116,11 +112,11 @@ signals:
               QString content,
               QByteArray data,
               QString mapping);
-//    void GET_REQUEST(QString url);
     void GET_REQUEST(QString url, QString fileName="");
 
 private slots:
-    void check_game();
+    void check_game_steam();
+    void check_game_tunngle();
     void updateProgress(qint64 bytesSent, qint64 bytesTotal);
     void toggleMenuVisibility();
     void toggleRacesVisibility();

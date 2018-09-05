@@ -94,7 +94,7 @@ namespace tyti
                     (void)wc;
                     return c;
                 }
-                static const char result(char c, wchar_t wc)
+                static char result(char c, wchar_t wc)
                 {
                     (void)wc;
                     return c;
@@ -109,7 +109,7 @@ namespace tyti
                     (void)c;
                     return wc;
                 }
-                static const wchar_t result(char c, wchar_t wc)
+                static wchar_t result(char c, const wchar_t wc)
                 {
                     (void)c;
                     return wc;

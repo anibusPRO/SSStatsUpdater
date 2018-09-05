@@ -101,7 +101,6 @@ QString GameInfo::get_stats(QString site_addr)
     site_addr += QString("mod=%1&").arg(QString(QUrl::toPercentEncoding(_mod_name))); // названием мода
     site_addr += QString("winby=%1&").arg(QString(QUrl::toPercentEncoding(_winby))); // условие победы
 
-    qDebug() << site_addr;
     return site_addr;
 }
 

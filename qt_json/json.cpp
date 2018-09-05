@@ -379,7 +379,7 @@ namespace QtJson {
                 break;
             }
             c = json[index++];
-            if (quoteOpen&&c == '\"'){
+            if (quoteOpen&&c == '"'){
                 if(squaredOpen)
                     s.append(c);
                 else{
@@ -392,17 +392,18 @@ namespace QtJson {
                 complete = true;
                 break;
             } else if (c == '\\') {
+
                 if (index == json.size())
                     break;
 
                 c = json[index++];
-
-                if (c == '\"') {
-                    s.append('\"');
+//                qDebug() << "symb ol \\";
+                if (c == '"') {
+                    s.append('"');
                 } else if (c == '\\') {
-                    s.append('\\');
+                    s.append("\\\\");
                 } else if (c == '/') {
-                    s.append('/');
+                    s.append("\\/");
                 } else if (c == 'b') {
                     s.append('\b');
                 } else if (c == 'f') {

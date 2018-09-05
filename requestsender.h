@@ -50,7 +50,6 @@ private:
     QString _userAgent;
 
 public slots:
-    void updateProgress(qint64 bytesSent, qint64 bytesTotal);
     void GET_REQUEST(QString url, QString fileName);
     void POST_REQUEST(QString url,
               QString name,

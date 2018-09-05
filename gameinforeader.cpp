@@ -63,7 +63,7 @@ int GameInfoReader::readySend(bool debug)
     read_warnings_log("APP -- Game Stop", -1);
     if(debug)
         qDebug() << last_startgame << last_stopgame << last_playback << playback_error;
-
+    if(is_playback) return 0;
     if(last_startgame==last_stopgame)
         return 3;
 
@@ -175,18 +175,18 @@ QString GameInfoReader::get_cur_profile_dir()
 
 bool GameInfoReader::is_map_valid()
 {
-    QString map_name;
+    QString mapName;
     QString error_str = read_warnings_log("Lobby -- Setting up game with scenario", 7, 5);
     if(error_str.contains("(invalid)"))
     {
-        map_name = error_str.remove(" (invalid)");
-        if(last_invalid_map==map_name)
+        mapName = error_str.remove(" (invalid)");
+        if(last_invalid_map==mapName)
             return true;
-        last_invalid_map = map_name;
-        if(QFile::exists(ss_path + "/DXP2/Data/Scenarios/mp/" + map_name+".sgb"))
-            qDebug() << "map" << map_name << "is invalid";
+        last_invalid_map = mapName;
+        if(QFile::exists(ss_path + "/DXP2/Data/Scenarios/mp/" + mapName+".sgb"))
+            qDebug() << "map" << mapName << "is invalid";
         else
-            qDebug() << "map does not exist" << map_name;
+            qDebug() << "map does not exist" << mapName;
         return false;
     }
 
@@ -227,42 +227,42 @@ int GameInfoReader::read_game_info(QMap<QString, QString> *sids, long totalActio
     QByteArray testStats = file.readAll();
     QVariantMap stats = QtJson::to_map(testStats);
     file.close();
-    int parse_res = 0;
-    if(!stats.contains("GSGameStats")) parse_res = 3;
+    int parseRes = 0;
+    if(!stats.contains("GSGameStats")) parseRes = 3;
     QVariantMap GSGameStats = stats.value("GSGameStats").toMap();
 
-    if(!GSGameStats.contains("WinBy"    )) parse_res = 4;
-    if(!GSGameStats.contains("Duration" )) parse_res = 5;
-    if(!GSGameStats.contains("Players"  )) parse_res = 6;
-    if(!GSGameStats.contains("Scenario" )) parse_res = 7;
-    if(!GSGameStats.contains("Teams"    )) parse_res = 8;
-    if(parse_res!=0){
+    if(!GSGameStats.contains("WinBy"    )) parseRes = 4;
+    if(!GSGameStats.contains("Duration" )) parseRes = 5;
+    if(!GSGameStats.contains("Players"  )) parseRes = 6;
+    if(!GSGameStats.contains("Scenario" )) parseRes = 7;
+    if(!GSGameStats.contains("Teams"    )) parseRes = 8;
+    if(parseRes!=0){
         qDebug() << testStats;
-        return parse_res;
+        return parseRes;
     }
     QString winby = GSGameStats.value("WinBy").toString();    // условие победы
-    int players_count = GSGameStats.value("Players").toInt(); // количество игроков
+    int playersNumber = GSGameStats.value("Players").toInt(); // количество игроков
     int duration = GSGameStats.value("Duration").toInt();     // продолжительность игры
-    int team_num = GSGameStats.value("Teams").toInt();        // количество команд
+    int teamNumber = GSGameStats.value("Teams").toInt();        // количество команд
 
-    if(team_num!=2) return 9;
+    if(teamNumber!=2) return 9;
     if(duration<MINIMUM_DURATION) return 10;
 
     double AverageAPM = (double)totalActions*60.0f/(double)duration;
     qDebug() << "WinBy:" << winby.toUpper();
     qDebug() << "AverageAPM with testStats duration:" << AverageAPM;
 
-    GameInfo game_info(players_count);
+    GameInfo gameInfo(playersNumber);
 
     // если настройки игры стандартные, то отправим статистику
-    int teams[8] = {0};
-    int fnl_state, sender_id=-1;
-    QString p_name;
-    for(int i=0; i<players_count;++i)
+    int teams[8] = {0,0,0,0,0,0,0,0};
+    int fnlState, senderID=-1;
+    QString pName;
+    for(int i=0; i<playersNumber;++i)
     {
-        QString player_id = "player_"+QString::number(i);
-        if(!GSGameStats.contains(player_id)) return 11;
-        QVariantMap player = GSGameStats.value(player_id).toMap();
+        QString playerID = "player_"+QString::number(i);
+        if(!GSGameStats.contains(playerID)) return 11;
+        QVariantMap player = GSGameStats.value(playerID).toMap();
         if(!player.contains("PHuman")) return 12;
         if(player.value("PHuman").toInt()!=1)
             return 13;
@@ -272,68 +272,82 @@ int GameInfoReader::read_game_info(QMap<QString, QString> *sids, long totalActio
 
         teams[player.value("PTeam").toInt()]++;
 
-        p_name = player.value("PName").toString();
-        if(sender_name==p_name)
+        pName = player.value("PName").toString();
+        if(sender_name==pName)
         {
-            fnl_state = player.value("PFnlState").toInt();
-            sender_id = i;
+            fnlState = player.value("PFnlState").toInt();
+            senderID = i;
         }
         else
-            fnl_state = player.value("PFnlState").toInt();
-        if(!sids->values().contains(p_name)){
-            qDebug() << "sids not contains" << p_name;
-            for(auto e : sids->keys()){
+            fnlState = player.value("PFnlState").toInt();
+        if(!sids->values().contains(pName)){
+            qDebug() << "Could not find" << pName << "in SIDs map!";
+            for(auto e : sids->keys())
               qDebug() << e << sids->value(e);
-            }
         }
-        game_info.add_player(p_name,
+        gameInfo.add_player(pName,
                                GameInfo::races.indexOf(player.value("PRace").toString()),
                                player.value("PTeam").toInt(),
-                               fnl_state,
-                               sids->key(p_name));
+                               fnlState,
+                               sids->key(pName));
     }
-
-    if(teams[0]!=teams[1]) return 15;
-    int game_type = teams[0];
-    if(sender_id!=-1&&winby.isEmpty())
+    int check_team = 0, maxPlayers=0;
+    for(int i=0;i<8;++i){
+        if(teams[i]>maxPlayers)
+            maxPlayers=teams[0];
+        if(teams[i]!=0&&teams[i]==maxPlayers)
+            ++check_team;
+    }
+    if(teamNumber!=check_team) return 15;
+    int gameType;
+    switch(teamNumber){
+    case 2: gameType = playersNumber/2; break;
+    case 3: gameType = 5; break;
+    case 4: gameType = 6; break;
+    case 5: gameType = 7; break;
+    case 6: gameType = 8; break;
+    case 7: gameType = 9; break;
+    case 8: gameType = 10; break;
+    }
+    if(senderID!=-1&&winby.isEmpty())
     {
-        int sender_team = game_info.getPlayer(sender_id).team;
+        int senderTeam = gameInfo.getPlayer(senderID).team;
         int loseleavers=1;
-        for(int i=0; i<players_count; ++i)
-            if((i!=sender_id&&game_info.getPlayer(i).team == sender_team)&&
-                    (game_info.getPlayer(i).fnl_state!=1))
+        for(int i=0; i<playersNumber; ++i)
+            if((i!=senderID&&gameInfo.getPlayer(i).team == senderTeam)&&
+                    (gameInfo.getPlayer(i).fnl_state!=1))
                         ++loseleavers;
 
-        if(loseleavers==game_type)
+        if(loseleavers==gameType)
             winby = "ANNIHILATE";
 
-        for(int i=0; i<players_count; ++i)
-            if(game_info.getPlayer(i).team != sender_team)
-                game_info.update_player(i, 5);
+        for(int i=0; i<playersNumber; ++i)
+            if(gameInfo.getPlayer(i).team != senderTeam)
+                gameInfo.update_player(i, 5);
     }
 
-    game_info.set_winby(winby.isEmpty()?"disconnect":winby);
+    gameInfo.set_winby(winby.isEmpty()?"disconnect":winby);
     _playback.clear();
     QString mod_name;
     if(last_startgame >= playback_error)
     {
         qDebug() << "playback reading";
-        RepReader rep_reader(ss_path+"/Playback/temp.rec");
-        if(!rep_reader.isStandart(game_type))
+        RepReader repReader(ss_path+"/Playback/temp.rec");
+        if(!repReader.isStandart(gameType))
             return 17;
         // конвертируем реплей в стимовскую версию
-        rep_reader.convertReplayToSteamVersion();
+        repReader.convertReplayToSteamVersion();
 
-        mod_name = rep_reader.replay.MOD;
+        mod_name = repReader.replay.MOD;
 
-        QString new_name = rep_reader.RenameReplay();
+        QString new_name = repReader.RenameReplay();
         // переименовываем название реплея в игре по стандарту
         if(!new_name.isEmpty())
             playback_name = new_name+".rec";
         else
             qDebug() << "Could not change playback name";
 
-        _playback = rep_reader.getReplayData();
+        _playback = repReader.getReplayData();
     }
     else
     {
@@ -342,16 +356,16 @@ int GameInfoReader::read_game_info(QMap<QString, QString> *sids, long totalActio
         mod_name = read_warnings_log("MOD -- Initializing Mod", 4);  // имя запущенного мода
     }
 
-    game_info.set_sender_name(sender_name);
-    game_info.set_steam_id(sender_steamID);
-    game_info.set_APMR(AverageAPM);
-    game_info.set_type(game_type);
-    game_info.set_team_number(team_num);
-    game_info.set_duration(duration);
-    game_info.set_map_name(GSGameStats.value("Scenario").toString());
-    game_info.set_mod_name(mod_name);
+    gameInfo.set_sender_name(sender_name);
+    gameInfo.set_steam_id(sender_steamID);
+    gameInfo.set_APMR(AverageAPM);
+    gameInfo.set_type(gameType);
+    gameInfo.set_team_number(teamNumber);
+    gameInfo.set_duration(duration);
+    gameInfo.set_map_name(GSGameStats.value("Scenario").toString());
+    gameInfo.set_mod_name(mod_name);
 
-    game_stats = game_info.get_stats();
+    game_stats = gameInfo.get_stats();
 
     return 0;
 }
@@ -404,41 +418,41 @@ QStringList GameInfoReader::get_players(bool with_mates)
     QByteArray testStats = file.readAll();
     QVariantMap stats = QtJson::to_map(testStats);
     file.close();
-    int parse_res = 0;
-    if(!stats.contains("GSGameStats")) parse_res = 3;
+    int parseRes = 0;
+    if(!stats.contains("GSGameStats")) parseRes = 3;
     QVariantMap GSGameStats = stats.value("GSGameStats").toMap();
-    if(!GSGameStats.contains("Players")) parse_res = 6;
-    if(parse_res!=0){
+    if(!GSGameStats.contains("Players")) parseRes = 6;
+    if(parseRes!=0){
         qDebug() << "testStats parsing error";
-        qDebug() << errors_list.at(parse_res);
+        qDebug() << errors_list.at(parseRes);
         qDebug() << testStats;
         return result;
     }
-    int players_count = GSGameStats.value("Players").toInt(); // количество игроков
+    int playersNumber = GSGameStats.value("Players").toInt(); // количество игроков
 
     QList<QVariantMap> players;
-    int sender_team=0, sender_id=-1;
-    for(int i=0; i<players_count;++i)
+    int senderTeam=0, senderID=-1;
+    for(int i=0; i<playersNumber;++i)
     {
-        QString player_id = "player_"+QString::number(i);
-        if(!GSGameStats.contains(player_id)) continue;
-        QVariantMap player = GSGameStats.value(player_id).toMap();
+        QString playerID = "player_"+QString::number(i);
+        if(!GSGameStats.contains(playerID)) continue;
+        QVariantMap player = GSGameStats.value(playerID).toMap();
         if(!(player.contains("PName")&&player.contains("PRace")&&player.contains("PTeam")))
             continue;
-        QString p_name = player.value("PName").toString();
-        if(sender_name==p_name)
+        QString pName = player.value("PName").toString();
+        if(sender_name==pName)
         {
-            sender_team = player.value("PTeam").toInt();
-            sender_id = i;
+            senderTeam = player.value("PTeam").toInt();
+            senderID = i;
         }
         players << player;
     }
     // если id отправителя не изменился, то его ник не найден в списке игроков
     // а это означает что он обозреватель, поэтому нужно вернуть пустой список
-    if(sender_id!=-1)
+    if(senderID!=-1)
     {
         for(int i=0; i<players.size();++i)
-            if(with_mates||players.at(i).value("PTeam")!=sender_team)
+            if(with_mates||players.at(i).value("PTeam")!=senderTeam)
                 result << QString(players.at(i).value("PName").toString()+" - "+
                           GameInfo::racesUC.at(GameInfo::races.indexOf(players.at(i).value("PRace").toString())));
     }

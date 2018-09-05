@@ -3,6 +3,7 @@
 #include <QNetworkRequest>
 #include <QStringList>
 #include <QDebug>
+#include <QBuffer>
 //#include <QUrlQuery>
 
 Request::Request(QString address /*= QString()*/)
@@ -89,11 +90,19 @@ QNetworkRequest Request::request(bool forGetRequest /*= true*/)/* const*/
 
     if (!forGetRequest)
     {
-//        qDebug() << QString::fromUtf8(paramFileType.data())
-//                 << QString::fromUtf8(paramFileName.data())
-//                 << QString::fromUtf8(paramContentType.data());
+
         //задаем разделитель
         QByteArray postData, boundary="1BEF0A57BE110FD467A";
+        //параметр 2 - файл
+        postData.append("--"+boundary+"\r\n");//разделитель
+        //имя параметра
+        postData.append("Content-Disposition: form-data; name=\"");
+        postData.append("ReplayCRC32");
+        postData.append("\"\r\n\r\n");
+        //значение параметра
+        postData.append(CRC32fromByteArray(paramData));
+        postData.append("\r\n");
+
         //параметр 2 - файл
         postData.append("--"+boundary+"\r\n");//разделитель
         //имя параметра
@@ -145,4 +154,21 @@ QByteArray Request::data(bool forGetRequest /*= true*/) const
     }
     else
         return dataToSend;
+}
+
+QString Request::CRC32fromByteArray( const QByteArray & array )
+{
+    quint32 crc32 = 0xffffffff;
+    QByteArray buf(256, 0);
+    qint64 n;
+    QBuffer buffer;
+    buffer.setData( array );
+    if ( !buffer.open( QIODevice::ReadOnly ) )
+        return 0;
+    while( ( n = buffer.read( buf.data(), 256) ) > 0 )
+        for ( qint64 i = 0; i < n; i++ )
+            crc32 = ( crc32 >> 8 ) ^ CRC32Table[(crc32 ^ buf.at(i)) & 0xff ];
+    buffer.close();
+    crc32 ^= 0xffffffff;
+    return QString("%1").arg(crc32, 8, 16, QChar('0'));
 }

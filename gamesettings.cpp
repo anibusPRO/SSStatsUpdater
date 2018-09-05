@@ -86,8 +86,8 @@ QString GameSettings::getResolvedCheats() const
 {
     switch (CheatsON)
     {
-        case 0: return "No";
-        case 1: return "Yes";
+        case 0: return "Yes";
+        case 1: return "No";
         default: return "Unknown";
     }
 }
