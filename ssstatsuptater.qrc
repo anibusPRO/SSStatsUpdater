@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>SSStatsSchTask.xml</file>
+    </qresource>
+</RCC>
