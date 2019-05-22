@@ -4,6 +4,7 @@
 
 #include <QNetworkProxy>
 #include <QSignalMapper>
+#include <QTimer>
 //#include <QStringListModel>
 #include <QUrl>
 #include "OSDaB-Zip/unzip.h"
@@ -23,7 +24,7 @@ public:
         NetworkError
     };
 
-    RequestSender(qint64 maxWaitTime = 35000, QObject * parent = nullptr);
+    RequestSender(int maxWaitTime = 35000, QObject * parent = nullptr);
     ~RequestSender();
 
     void setProxy(const QNetworkProxy& proxy);
@@ -35,19 +36,21 @@ public:
     QByteArray postWhileSuccess(Request& request, int maxCount = 2);
     static bool compress(const QString& zip, const QString& dir, const QString& pwd);
     static bool decompress(const QString& file, const QString& out, const QString& pwd);
-    void setMaxWaitTime(qint64 max);
-    qint64 maxWaitTime() const;
+    void setMaxWaitTime(int max);
+    int maxWaitTime() const;
     RequestError error() const;
     void setUserAgent(QString agent);
 private:
     QByteArray sendRequest(Request& request, bool getRequest = true);
     QByteArray sendWhileSuccess(Request& request, int maxCount = 2, bool getRequest = true);
-    qint64 _maxWaitTime;
+    int _maxWaitTime;
     RequestError _error;
     QNetworkProxy _proxy;
     QNetworkAccessManager* m_manager;
     QSignalMapper m_mapper;
     QString _userAgent;
+
+//    int curDProgress;
 
 public slots:
     void GET_REQUEST(QString url, QString fileName);
@@ -60,6 +63,7 @@ private slots:
     void slotFinished(QNetworkReply*);
     void map(QNetworkReply* reply);
     void onFeedRetrieved(const QString &fileName);
+    void DProgress(qint64 bytesReceived, qint64 bytesTotal);
 
 signals:
     void send_reply(QByteArray);

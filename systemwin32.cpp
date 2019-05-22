@@ -223,29 +223,32 @@ bool systemWin32::findProcessByWindowName(QString name)
     WCHAR temp[name.size()+1]={0};
     name.toWCharArray(temp);
     HWND hWnd = FindWindow(NULL, temp);
-    DWORD PID;
-    if(hWnd==NULL){
-        return false;
-    }
-    GetWindowThreadProcessId(hWnd, &PID);
-
-    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-
-    if (hSnap == INVALID_HANDLE_VALUE)
-    {
-        qDebug() << "CreateToolhelp32Snapshot: Error" << GetLastError();
+    if(hWnd)
         return true;
-    }
+    else
+        return false;
+//    if(hWnd==NULL)
+//        return false;
+//    DWORD PID;
+//    GetWindowThreadProcessId(hWnd, &PID);
 
-    PROCESSENTRY32 proc;
-    proc.dwSize = sizeof(PROCESSENTRY32);
-    Process32First(hSnap, &proc);
-    do{
-        if(proc.th32ProcessID==PID)
-        {
-            CloseHandle(hSnap);
-            return true;
-        }
-    }while(Process32Next(hSnap, &proc));
-    return false;
+//    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+//    if (hSnap == INVALID_HANDLE_VALUE)
+//    {
+//        qDebug() << "CreateToolhelp32Snapshot: Error" << GetLastError();
+//        return true;
+//    }
+
+//    PROCESSENTRY32 proc;
+//    proc.dwSize = sizeof(PROCESSENTRY32);
+//    Process32First(hSnap, &proc);
+//    do{
+//        if(proc.th32ProcessID==PID)
+//        {
+//            CloseHandle(hSnap);
+//            return true;
+//        }
+//    }while(Process32Next(hSnap, &proc));
+//    return false;
 }

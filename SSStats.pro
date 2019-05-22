@@ -8,13 +8,27 @@ TEMPLATE = app
 
 TARGET = SSStats
 
-PROJECT_PATH = "E:/OpenServer/domains/dowstats.loc/ssstats"
+PROJECT_PATH = "F:/OpenServer/domains/dowstats.loc/ssstats"
 DESTDIR      = $$PROJECT_PATH
-target.path = "E:/Program Files (x86)/Steam/steamapps/common/Dawn of War Soulstorm"
+target.path = $$quote($$(PROGRAMFILES)/Steam/steamapps/common/Dawn of War Soulstorm)
 target.files = $$DESTDIR/SSStats.exe
 INSTALLS += target
 RC_FILE = ssstats.rc
-INCLUDEPATH += E:/boost/include/boost-1_63
+INCLUDEPATH += F:/boost/include/boost-1_63
+
+
+#PRE_TARGETDEPS += .beforebuild
+
+#before_build.target = .beforebuild
+#before_build.depends = FORCE
+#before_build.commands = chcp 1251
+
+#POST_TARGETDEPS += .afterbuild
+
+#after_build.target = .afterbuild
+#before_build.depends = FORCE
+#before_build.commands = start $$quote($$(PROGRAMFILES)/Steam/steamapps/common/Dawn of War Soulstorm/SSStats.exe)
+
 #TYPELIBS = TunngleSniffer.tlb
 SOURCES += main.cpp \
         request.cpp \
@@ -64,14 +78,17 @@ HEADERS += request.h \
         defines.h \
     qtxglobalshortcut/qxtglobal.h \
     qtxglobalshortcut/qxtglobalshortcut.h \
-    qtxglobalshortcut/qxtglobalshortcut_p.h
+    qtxglobalshortcut/qxtglobalshortcut_p.h \
+    types.h
 
 
-LIBS += -lpsapi
+LIBS += -lpsapi -lz
 
-include(E:/Programming/SSStats/qt_json/qt_json.pri)
+include(F:/Programming/SSStats/qt_json/qt_json.pri)
 
 win32 {
-    WINSDK_DIR = E:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
-    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
+    WINSDK_DIR = F:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
+#    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
+    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"${DESTDIR_TARGET};1\""
+
 }

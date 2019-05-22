@@ -28,13 +28,8 @@ GameInfoReader::GameInfoReader()
 /*16*/                  "ERROR! Could not open 'temp.rec'"<<
 /*17*/                  "ERROR! Game options is not standart"<<
 /*18*/                  "Current game is playback";
-    is_playback = false;
     soulstorm_start_dt = QDateTime();
-    current_mod_index = 0;
-    last_playback  = 0;
-    last_startgame = 0;
-    last_stopgame  = 0;
-    playback_error = 0;
+    reset();
 }
 
 GameInfoReader::~GameInfoReader()
@@ -60,10 +55,64 @@ void GameInfoReader::reset()
 
 int GameInfoReader::readySend(bool debug)
 {
-    read_warnings_log("APP -- Game Stop", -1);
+    if(is_playback) return 0;
+
+    QFile file(ss_path+"/warnings.log");
+    if(file.open(QIODevice::ReadOnly)){
+        QTextStream textStream(&file);
+        QStringList game_flags;
+        game_flags << "APP -- Game Stop"
+                   << "APP -- Game Start"
+                   << "APP -- Game Playback"
+                   << "REC -- Error opening file playback:temp.rec for write"
+                   << "GAME -- Ending mission"
+                   << "APP -- Game Load";
+
+        QStringList fileLines = textStream.readAll().split("\r");
+        int counter = fileLines.size();
+        while (counter!=0){  // пока не начало файла
+            QString line = fileLines.at(counter-1);  // читаем следующую строку из файла
+            if(line.contains(game_flags.at(0))){  // если строка содержит APP -- Game Stop, то игра завершена
+                last_stopgame = counter;  // получим позицию APP -- Game Stop
+                break;  // выходим из цикла, так как понятно что началась новая игра
+            }
+            if(line.contains(game_flags.at(4))  // если строка содержит GAME -- Ending mission
+                    ||line.contains(game_flags.at(5))){  // или APP -- Game Load
+                last_stopgame = counter;  // то получим позицию остановки игры
+                if(last_startgame>last_stopgame){  // и если начало игры было позже остановки
+                    while (counter!=(last_stopgame-10)){  // то ищем APP -- Game Playback в ближайших 10 строках
+                        QString line = fileLines.at(counter-1);
+                        if(line.contains(game_flags.at(0))){  // но если строка содержит APP -- Game Stop
+                            last_stopgame = counter;  // то игра точно не просмотр реплея
+                            break;
+                        }
+                        if(line.contains(game_flags.at(2))){  // если игра - реплей
+                            last_playback = counter;  // то сделаем так, чтобы сравнение это показало
+                            last_stopgame = counter-1;  // и статистика не начала считаться
+                            break;
+                        }
+                        --counter;
+                    }
+                    if(counter>=last_stopgame) break;
+                }
+            }
+            if(line.contains(game_flags.at(1)))
+                last_startgame = counter;
+            if(line.contains(game_flags.at(2))){
+                last_playback = counter;
+                break;
+            }
+            if(line.contains(game_flags.at(3)))
+                playback_error = counter;
+            --counter;
+        }
+        file.close();
+    } else
+        qDebug() << "read_warnings_log 1" << "Could not open warnings.log";
+
     if(debug)
         qDebug() << last_startgame << last_stopgame << last_playback << playback_error;
-    if(is_playback) return 0;
+
     if(last_startgame==last_stopgame)
         return 3;
 
@@ -294,11 +343,15 @@ int GameInfoReader::read_game_info(QMap<QString, QString> *sids, long totalActio
     int check_team = 0, maxPlayers=0;
     for(int i=0;i<8;++i){
         if(teams[i]>maxPlayers)
-            maxPlayers=teams[0];
+            maxPlayers=teams[i];
         if(teams[i]!=0&&teams[i]==maxPlayers)
             ++check_team;
     }
-    if(teamNumber!=check_team) return 15;
+    if(teamNumber!=check_team){
+        qDebug() << teams[0] << teams[1] << teams[2] << teams[3]
+                << teams[4] << teams[5] << teams[6] << teams[7];
+        return 15;
+    }
     int gameType;
     switch(teamNumber){
     case 2: gameType = playersNumber/2; break;
@@ -511,7 +564,7 @@ QString GameInfoReader::read_warnings_log(QString str, int offset, int count/*=1
                << "APP -- Game Load";
 
 
-    bool fstate = false;
+//    bool fstate = false;
     QStringList fileLines = textStream.readAll().split("\r");
     int counter = fileLines.size();
     while (counter!=0)
@@ -552,23 +605,23 @@ QString GameInfoReader::read_warnings_log(QString str, int offset, int count/*=1
                 out = out.left(out.size()-1);
 
         }
-        if(!fstate)
-        {
+//        if(!fstate)
+//        {
 
-            if(line.contains(game_flags.at(0))
-                    ||(!is_playback&&line.contains(game_flags.at(4)))
-                    ||line.contains(game_flags.at(5)))
-            {
-                last_stopgame = counter;
-                fstate = true;
-            }
-            if(line.contains(game_flags.at(1)))
-                last_startgame = counter;
-            if(line.contains(game_flags.at(2)))
-                last_playback = counter;
-            if(line.contains(game_flags.at(3)))
-                playback_error = counter;
-        }
+//            if(line.contains(game_flags.at(0))
+//                    ||line.contains(game_flags.at(4))
+//                    ||line.contains(game_flags.at(5)))
+//            {
+//                last_stopgame = counter;
+//                fstate = true;
+//            }
+//            if(line.contains(game_flags.at(1)))
+//                last_startgame = counter;
+//            if(line.contains(game_flags.at(2)))
+//                last_playback = counter;
+//            if(line.contains(game_flags.at(3)))
+//                playback_error = counter;
+//        }
 
         // если искомое слово найдено, то можно завершать цикл
         if(!out.isEmpty())

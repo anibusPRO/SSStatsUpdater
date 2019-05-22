@@ -2,7 +2,7 @@
 
 #include <windows.h>
 #include "..\APMKeyHook\APMKeyHook.h"
-
+#include "types.h"
 
 #define RING_SIZE 20
 #define MEASURE_CYCLE_LENGTH 500
@@ -37,7 +37,7 @@ public:
 
 private:
 	HANDLE hSharedMemory;
-	LPLONG lpSharedMemory;
+    PGameInfo lpSharedMemory;
 
 	DWORD absolute_starttick;
 

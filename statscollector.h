@@ -12,39 +12,7 @@
 #include <QThread>
 #include "defines.h"
 #include "qtxglobalshortcut/qxtglobalshortcut.h"
-
-typedef struct{
-    char name[100];
-    int race;
-    int gamesCount;
-    int winsCount;
-    int winRate;
-    int mmr;
-    int mmr1v1;
-    int apm;
-} TPlayer;
-
-typedef struct{
-    bool enableDXHook;
-    int version;
-    char players[8][100];
-    int playersNumber;
-    TPlayer lobbyPlayers[50];
-    char mapName[50];
-    int AverageAPM;
-    int CurrentAPM;
-    int MaxAPM;
-    int downloadProgress;
-    bool fontsInited;
-    bool showMenu;
-    bool showRaces;
-    bool showAPM;
-    DWORD statsThrId;
-    PDWORD sidsAddr[10];
-    bool sidsAddrLock;
-} TGameInfo;
-
-typedef TGameInfo *PGameInfo;
+#include "types.h"
 
 class StatsCollector : public QObject
 {
@@ -71,7 +39,7 @@ private:
     bool send_logfiles();
     bool removeDir(const QString & dirName);
     void processFlags(bool force=false);
-    int GetSteamPlayersInfo(bool get_stats=true);
+    DWORD GetSteamPlayersInfo(bool get_stats=true);
 
     QString sender_steamID;
     QString sender_name;
@@ -121,6 +89,7 @@ private slots:
     void toggleMenuVisibility();
     void toggleRacesVisibility();
     void toggleAPMVisibility();
+//    void toggleHPVisibility();
 
 public slots:
     void exitHandler();

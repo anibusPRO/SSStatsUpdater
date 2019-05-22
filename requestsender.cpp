@@ -1,5 +1,4 @@
 #include <windows.h>
-#include <QTimer>
 #include <QEventLoop>
 #include <QSharedPointer>
 #include <QDebug>
@@ -13,7 +12,7 @@ void RequestSender::map(QNetworkReply *reply)
      m_mapper.map(reply);
 }
 
-RequestSender::RequestSender(qint64 maxWaitTime /*= 35000*/, QObject *parent) : QObject{parent}
+RequestSender::RequestSender(int maxWaitTime /*= 35000*/, QObject *parent) : QObject{parent}
 {
     _maxWaitTime = maxWaitTime;
     _error = NoError;
@@ -116,7 +115,7 @@ QByteArray RequestSender::postWhileSuccess(Request& request, int maxCount /*= 2*
     return sendWhileSuccess(request, maxCount, false);
 }
 
-void RequestSender::setMaxWaitTime(qint64 max)
+void RequestSender::setMaxWaitTime(int max)
 {
     _maxWaitTime = max;
 }
@@ -125,7 +124,7 @@ void RequestSender::setUserAgent(QString agent)
     _userAgent = agent;
 }
 
-qint64 RequestSender::maxWaitTime() const
+int RequestSender::maxWaitTime() const
 {
     return _maxWaitTime;
 }
@@ -133,6 +132,12 @@ qint64 RequestSender::maxWaitTime() const
 RequestSender::RequestError RequestSender::error() const
 {
     return _error;
+}
+
+void RequestSender::DProgress(qint64 bytesReceived, qint64 bytesTotal)
+{
+//    timout.start(_maxWaitTime);
+//    qDebug() << 100*bytesReceived/bytesTotal << '%';
 }
 
 QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true*/)
@@ -154,6 +159,8 @@ QByteArray RequestSender::sendRequest(Request& request, bool getRequest /*= true
     timout.setSingleShot(true);
     connect(&timout, SIGNAL(timeout()), &loop, SLOT(quit()));
     connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+//    curDProgress = 0;
+    connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(DProgress(qint64,qint64)));
     timout.start(_maxWaitTime);
     loop.exec();
 

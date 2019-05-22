@@ -20,8 +20,8 @@
 #include <psapi.h>
 #include <io.h>
 #include <fcntl.h>
-#include <Windows.h>
-
+#include <windows.h>
+#include <QApplication>
 
 using namespace tyti;
 using namespace std;
@@ -55,12 +55,12 @@ StatsCollector::StatsCollector(QObject *parent) :
     useOldSIDSearch = false;
     curFog = false;
     curHP = false;
-    log.installLog("stats.log");
+    log.installLog("stats_main.log");
     server_addr = "http://www.dowstats.ru";
     cur_time = QDateTime::currentDateTime();
     reader = new GameInfoReader();
     lpSharedMemory = nullptr;
-    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
+    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
     if(hSharedMemory)
         lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
     else
@@ -122,6 +122,7 @@ bool StatsCollector::start()
         QString showMenuHK = settings.value("hotkeys/showMenuHK", "Ctrl+Shift+M").toString();
         QString showRaceHK = settings.value("hotkeys/showRaceHK", "Ctrl+Shift+R").toString();
         QString showAPMHK  = settings.value("hotkeys/showAPMHK", "Ctrl+Shift+A").toString();
+//        QString showHPHK  = settings.value("hotkeys/showHPHK", "Alt").toString();
 
         QxtGlobalShortcut* menuShortcut = new QxtGlobalShortcut(QKeySequence(showMenuHK), this);
         connect(menuShortcut, SIGNAL(activated()), this, SLOT(toggleMenuVisibility()));
@@ -129,6 +130,8 @@ bool StatsCollector::start()
         connect(racesShortcut, SIGNAL(activated()), this, SLOT(toggleRacesVisibility()));
         QxtGlobalShortcut* apmShortcut = new QxtGlobalShortcut(QKeySequence(showAPMHK), this);
         connect(apmShortcut, SIGNAL(activated()), this, SLOT(toggleAPMVisibility()));
+//        QxtGlobalShortcut* hpShortcut = new QxtGlobalShortcut(QKeySequence(showHPHK), this);
+//        connect(hpShortcut, SIGNAL(activated()), this, SLOT(toggleHPVisibility()));
     } else qDebug() << "DXHOOK DISABLED";
 
     QNetworkAccessManager nam;
@@ -165,6 +168,7 @@ bool StatsCollector::start()
     connect(&stats_timer, SIGNAL(timeout()), this, SLOT(check_game_steam()));
 
     apm_thread->start();
+
     stats_timer.start(5000);
 
     send_logfiles();
@@ -210,8 +214,8 @@ void StatsCollector::check_game_steam()
 {
     QSettings settings("stats.ini", QSettings::IniFormat);
     QDateTime last_modified = QFileInfo(reader->get_cur_profile_dir() +"/testStats.lua").lastModified();
-    // если время последнего изменения файла больше предыдущего
-    // то это либо начало игры, либо конец, что необходимо обработать
+    /* если время последнего изменения файла больше предыдущего,
+    то это либо начало игры, либо конец, что необходимо обработать */
     if(last_modified>cur_time){
         QTimer showRacesTimer;
         bool procIsActive = true, isObserver = false;
@@ -288,7 +292,7 @@ void StatsCollector::check_game_steam()
                     if(!isObserver&&enableDXHook){
                         lpSharedMemory->CurrentAPM = apm_meter.getCurrentAPM();
                         lpSharedMemory->AverageAPM = apm_meter.getAverageAPM();
-                        if(lpSharedMemory->MaxAPM>0||apm_meter.getTime()>=(DWORD)120000)
+                        if(lpSharedMemory->MaxAPM>0||apm_meter.getTime()>=static_cast<DWORD>(120000))
                             lpSharedMemory->MaxAPM = apm_meter.getMaxAPM();
                     }
                     Sleep(1000);
@@ -350,7 +354,7 @@ void StatsCollector::check_game_steam()
 
 void StatsCollector::updateProgress(qint64 bytesSent, qint64 bytesTotal)
 {
-    int progress = (int)(100*bytesSent/bytesTotal);
+    int progress = static_cast<int>(100*bytesSent/bytesTotal);
     if(enableDXHook){
         lpSharedMemory->downloadProgress = progress;
         if(progress==100){
@@ -363,6 +367,40 @@ void StatsCollector::updateProgress(qint64 bytesSent, qint64 bytesTotal)
     }
 }
 
+//void StatsCollector::toggleHPVisibility()
+//{
+//{
+////    QSettings settings("stats.ini", QSettings::IniFormat);
+////    bool tHP = settings.value("settings/showHP", false).toBool();
+//    // если значение флагов не изменилось и игра не была перезапущена
+//    // то возврат из функции
+////    if(!tHP) return;
+
+//    // получаем HANDLE процесса игры
+//    HWND hWnd = FindWindow(nullptr, L"Dawn of War: Soulstorm");
+//    if(hWnd==nullptr) return;
+//    DWORD PID;
+//    GetWindowThreadProcessId(hWnd, &PID);
+//    HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, PID);
+//    if(hProcess==nullptrptr){
+//        qDebug() << "Could not open process" << GetLastError();
+//        return;
+//    }
+
+//    // если значение флага изменилось
+//    // или принудительно (обычно в случае перезапуска игры,
+//    // так как значение флага не может не соответствовать реальности)
+//    ReadProcessMemory(hProcess, HPAddr, temp4, 4, nullptr);
+//    if(curHP&&memcmp(temp4, CodeHP, 4)==0){
+//        qDebug() << "Show HP bars";
+//        WriteProcessMemory(hProcess, HPAddr, nop_array4, 4, nullptr);
+//    }else if(!curHP){
+//        qDebug() << "Hide HP bars";
+//        WriteProcessMemory(hProcess, HPAddr, CodeHP, 4, nullptr);
+//    }
+//    CloseHandle(hProcess);
+//}
+
 void StatsCollector::toggleAPMVisibility()
 {
     if(lpSharedMemory){
@@ -370,6 +408,7 @@ void StatsCollector::toggleAPMVisibility()
         qDebug() << "APMVisibility:" << (lpSharedMemory->showAPM?"On":"Off");
     }
 }
+
 
 void StatsCollector::exitHandler()
 {
@@ -416,9 +455,9 @@ bool StatsCollector::send_logfiles()
     QDir cur_dir(ss_path);
     if(cur_dir.exists("stats_logs")) removeDir(ss_path+"/stats_logs");
     cur_dir.mkdir("stats_logs");
-    QFile::copy(ss_path+"/update.log", ss_path+"/stats_logs/update.log");
-    QFile::copy(ss_path+"/dxhook.log", ss_path+"/stats_logs/dxhook.log");
-    QFile::copy(ss_path+"/stats.log", ss_path+"/stats_logs/stats.log");
+    QFile::copy(ss_path+"/stats_update.log", ss_path+"/stats_logs/stats_update.log");
+    QFile::copy(ss_path+"/stats_dxhook.log", ss_path+"/stats_logs/stats_dxhook.log");
+    QFile::copy(ss_path+"/stats_main.log", ss_path+"/stats_logs/stats_main.log");
     QFile::copy(ss_path+"/warnings.log", ss_path+"/stats_logs/warnings.log");
     QFile::copy(ss_path+"/stats.ini", ss_path+"/stats_logs/stats.ini");
     QFile::copy(reader->get_cur_profile_dir() +"/testStats.lua",ss_path+"/stats_logs/testStats.lua");
@@ -467,14 +506,23 @@ void StatsCollector::processFlags(bool force)
     QSettings settings("stats.ini", QSettings::IniFormat);
     // получим новые значения флагов
     bool tFog = settings.value("settings/disableFog", false).toBool();
-    bool tHP = settings.value("settings/showHP", false).toBool();
+//    bool tHP = settings.value("settings/showHP", false).toBool();
     // если значение флагов не изменилось и игра не была перезапущена
     // то возврат из функции
-    if(tFog==curFog&&tHP==curHP&&!force) return;
+    if(tFog==curFog/*&&tHP==curHP*/&&!force) return;
+
+    if(lpSharedMemory){
+        lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
+        if(enableDXHook){
+            lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
+            lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
+            lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
+        }
+    }
 
     // получаем HANDLE процесса игры
-    HWND hWnd = FindWindow(NULL, L"Dawn of War: Soulstorm");
-    if(hWnd==NULL) return;
+    HWND hWnd = FindWindow(nullptr, L"Dawn of War: Soulstorm");
+    if(hWnd==nullptr) return;
     DWORD PID;
     GetWindowThreadProcessId(hWnd, &PID);
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, PID);
@@ -484,34 +532,34 @@ void StatsCollector::processFlags(bool force)
     }
 
     if(tFog!=curFog||force){
-        ReadProcessMemory(hProcess, FogAddr, temp6, 6, NULL);
-        ReadProcessMemory(hProcess, Float512Addr, temp4, 4, NULL);
-        ReadProcessMemory(hProcess, MapSkyDistanceAddr, temp6_2, 6, NULL);
+        ReadProcessMemory(hProcess, FogAddr, temp6, 6, nullptr);
+        ReadProcessMemory(hProcess, Float512Addr, temp4, 4, nullptr);
+        ReadProcessMemory(hProcess, MapSkyDistanceAddr, temp6_2, 6, nullptr);
 
         if(tFog&&memcmp(temp6, CodeFog, 6)==0){
             qDebug() << "Disable fog";
-            WriteProcessMemory(hProcess, FogAddr, nop_array6, 6, NULL);
+            WriteProcessMemory(hProcess, FogAddr, nop_array6, 6, nullptr);
         }else if(!tFog){
             qDebug() << "Enable fog";
-            WriteProcessMemory(hProcess, FogAddr, CodeFog, 6, NULL);
+            WriteProcessMemory(hProcess, FogAddr, CodeFog, 6, nullptr);
         }
         if(tFog&&memcmp(temp4, CodeF512, 4)==0){
             VirtualProtectEx(hProcess, Float512Addr, 4, PAGE_EXECUTE_READWRITE, &Float512OldProtect);
-            if(!WriteProcessMemory(hProcess, Float512Addr, Float512, 4, NULL))
+            if(!WriteProcessMemory(hProcess, Float512Addr, Float512, 4, nullptr))
                 qDebug() << "Could not write CodeF512 to memory";
-            VirtualProtectEx(hProcess, Float512Addr, 4, Float512OldProtect, 0);
+            VirtualProtectEx(hProcess, Float512Addr, 4, Float512OldProtect, nullptr);
         }else if(!tFog){
 //            qDebug() << "temp4 is not equal to CodeF512";
             VirtualProtectEx(hProcess, Float512Addr, 4, PAGE_EXECUTE_READWRITE, &Float512OldProtect);
-            WriteProcessMemory(hProcess, Float512Addr, CodeF512, 4, NULL);
-            VirtualProtectEx(hProcess, Float512Addr, 4, Float512OldProtect, 0);
+            WriteProcessMemory(hProcess, Float512Addr, CodeF512, 4, nullptr);
+            VirtualProtectEx(hProcess, Float512Addr, 4, Float512OldProtect, nullptr);
         }
         if(tFog&&memcmp(temp6_2, CodeMapSkyDistance, 6)==0){
-            if(!WriteProcessMemory(hProcess, MapSkyDistanceAddr, nop_array6, 6, NULL))
+            if(!WriteProcessMemory(hProcess, MapSkyDistanceAddr, nop_array6, 6, nullptr))
                 qDebug() << "Could not write CodeMapSkyDistance to memory";
         }else if(!tFog){
 //            qDebug() << "temp6 is not equal to CodeMapSkyDistance";
-            WriteProcessMemory(hProcess, MapSkyDistanceAddr, CodeMapSkyDistance, 6, NULL);
+            WriteProcessMemory(hProcess, MapSkyDistanceAddr, CodeMapSkyDistance, 6, nullptr);
         }
 //        QByteArray array4((const char*)temp4, 4);
 //        qDebug() << QString(array4.toHex());
@@ -523,17 +571,17 @@ void StatsCollector::processFlags(bool force)
     // если значение флага изменилось
     // или принудительно (обычно в случае перезапуска игры,
     // так как значение флага не может не соответствовать реальности)
-    if(tHP!=curHP||force){
-        ReadProcessMemory(hProcess, HPAddr, temp4, 4, NULL);
-        if(tHP&&memcmp(temp4, CodeHP, 4)==0){
-            qDebug() << "Show HP bars";
-            WriteProcessMemory(hProcess, HPAddr, nop_array4, 4, NULL);
-        }else if(!tHP){
-            qDebug() << "Hide HP bars";
-            WriteProcessMemory(hProcess, HPAddr, CodeHP, 4, NULL);
-        }
-        curHP = tHP;
-    }
+//    if(tHP!=curHP||force){
+//        ReadProcessMemory(hProcess, HPAddr, temp4, 4, nullptr);
+//        if(tHP&&memcmp(temp4, CodeHP, 4)==0){
+//            qDebug() << "Show HP bars";
+//            WriteProcessMemory(hProcess, HPAddr, nop_array4, 4, nullptr);
+//        }else if(!tHP){
+//            qDebug() << "Hide HP bars";
+//            WriteProcessMemory(hProcess, HPAddr, CodeHP, 4, nullptr);
+//        }
+//        curHP = tHP;
+//    }
     CloseHandle(hProcess);
 }
 
@@ -675,11 +723,11 @@ StatsCollector::~StatsCollector()
 }
 
 
-int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
+DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
     PlayersInfo.clear();
-    HWND hWnd = FindWindow(NULL, L"Dawn of War: Soulstorm");
+    HWND hWnd = FindWindow(nullptr, L"Dawn of War: Soulstorm");
     DWORD PID;
-    if(hWnd==NULL){
+    if(hWnd==nullptr){
         return GetLastError();
     }
     GetWindowThreadProcessId(hWnd, &PID);
@@ -696,16 +744,17 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
     QByteArray buffer(30400, 0);
     for(int i=0; i<10; ++i){
         PVOID readAddr = lpSharedMemory->sidsAddr[i];
+//        qDebug() << i << "address of steam IDs:" << readAddr;
         SIZE_T bytesRead = 0;
         // если функция вернула не ноль, то продолжим цикл
-        if(!ReadProcessMemory(hProcess, readAddr, (PVOID)buffer.data(), buffer.size(), &bytesRead)){
+        if(!ReadProcessMemory(hProcess, readAddr, buffer.data(), 30400, &bytesRead)){
             if(GetLastError()!=299)
                 qDebug() << "Could not read process memory" << readAddr << GetLastError();
             continue;
         }
-        for (uint i = 0; i < bytesRead - 200; i++) {
+        for (int i = 0; i < static_cast<int>(bytesRead - 200); i++) {
             bool match = false;
-            for (uint j = 0; j < sizeof(steamHeader); j++)
+            for (int j = 0; j < static_cast<int>(sizeof(steamHeader)); j++)
                 if (buffer.at(i + j) != steamHeader[j]){
                     match = false;
                     break;
@@ -743,120 +792,118 @@ int StatsCollector::GetSteamPlayersInfo(bool get_stats) {
     }
     lpSharedMemory->sidsAddrLock = false;
 //    }
+//    qDebug() << "PlayersInfo";
+//    if(PlayersInfo.isEmpty()){
+////        if(!useOldSIDSearch)
+////        qDebug() << "Using old SID search";
+////        useOldSIDSearch = true;
+//#ifndef TH32CS_SNAPMODULE32
+//#define TH32CS_SNAPMODULE32 0x8
+//#endif
+//        if(moduleInfo.isEmpty()){  // если список модулей пуст, то заполним его
+//            HANDLE hthSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, PID);
+//            if (hthSnapshot!=INVALID_HANDLE_VALUE)
+//            {
+//                MODULEENTRY32 me = { sizeof(me) };
+//                Module32First(hthSnapshot, &me);
+//                do moduleInfo.insert((DWORD)me.modBaseAddr, (DWORD)me.modBaseSize);
+//                while(Module32Next(hthSnapshot, &me));
+//                CloseHandle(hthSnapshot);
+//            }
+//        }
+//        unsigned long ptr1Count = 0x00000000;
+//        MEMORY_BASIC_INFORMATION mbi;
+//        LPCVOID ptr1 = (LPCVOID)ptr1Count;
+//        QByteArray buffer(30400, 0);
 
-    if(PlayersInfo.isEmpty()){
-//        if(!useOldSIDSearch)
-//        qDebug() << "Using old SID search";
-//        useOldSIDSearch = true;
-#ifndef TH32CS_SNAPMODULE32
-#define TH32CS_SNAPMODULE32 0x8
-#endif
-        if(moduleInfo.isEmpty()){  // если список модулей пуст, то заполним его
-            HANDLE hthSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, PID);
-            if (hthSnapshot!=INVALID_HANDLE_VALUE)
-            {
-                MODULEENTRY32 me = { sizeof(me) };
-                Module32First(hthSnapshot, &me);
-                do moduleInfo.insert((DWORD)me.modBaseAddr, (DWORD)me.modBaseSize);
-                while(Module32Next(hthSnapshot, &me));
-                CloseHandle(hthSnapshot);
-            }
-        }
-        long ptr1Count = 0x00000000;
-        MEMORY_BASIC_INFORMATION mbi;
-        LPCVOID ptr1 = (LPCVOID)ptr1Count;
-        QByteArray buffer(30400, 0);
-        while (ptr1Count <= 0x7FFE0000) // До конца виртуальной памяти для данного процесса
-        {
-            if(moduleInfo.keys().contains(ptr1Count)){  // если указатель является указателем на начало модуля
-                ptr1Count = ptr1Count + moduleInfo.value(ptr1Count);
-                ptr1 = (PVOID)ptr1Count;
-                continue;  // то пропустим его, так как нет смысла искать сиды в памяти модулей
-            }
-            VirtualQueryEx(hProcess, ptr1, &mbi, sizeof(mbi));
+//        while (ptr1Count <= 0x7FFE0000) // До конца виртуальной памяти для данного процесса
+//        {
+//            if(moduleInfo.keys().contains(ptr1Count)){  // если указатель является указателем на начало модуля
+//                ptr1Count = ptr1Count + moduleInfo.value(ptr1Count);
+//                ptr1 = (PVOID)ptr1Count;
+//                continue;  // то пропустим его, так как нет смысла искать сиды в памяти модулей
+//            }
+//            VirtualQueryEx(hProcess, ptr1, &mbi, sizeof(mbi));
 
-            if(mbi.Type==MEM_PRIVATE&&
-                mbi.AllocationProtect==PAGE_READWRITE&&
-                mbi.Protect==PAGE_READWRITE&&
-                mbi.State==MEM_COMMIT&&mbi.RegionSize<0xFFF000)
-            {
-                for (PCHAR readAddr = (PCHAR)mbi.BaseAddress; readAddr < (PCHAR)mbi.BaseAddress+mbi.RegionSize; readAddr += buffer.size() - 200) {
-                    SIZE_T bytesRead = 0;
-                    if(!ReadProcessMemory(hProcess, (PVOID)readAddr, (PVOID)buffer.data(), buffer.size(), &bytesRead)){
-                        if(GetLastError()!=299)
-                            qDebug() << "Could not read process memory" << GetLastError();
-                        continue;
-                    }
-                    for (uint i = 0; i < bytesRead - 200; i++) {
-                        bool match = false;
-                        for (uint j = 0; j < sizeof(steamHeader); j++)
-                            if (buffer[i + j] != steamHeader[j]){
-                                match = false;
-                                break;
-                            }else match = true;
-                        if (!match)continue;
-                        int nickPos = i + 56;
-                        if (buffer.at(nickPos) < 50 &&
-                            buffer.at(nickPos) > 0 &&
-                            buffer.at(nickPos + 1) == 0 &&
-                            buffer.at(nickPos + 2) == 0 &&
-                            buffer.at(nickPos + 3) == 0 &&
-                            buffer.at(nickPos - 1) == 0 &&
-                            buffer.at(nickPos - 2) == 0 &&
-                            buffer.at(nickPos - 3) == 0 &&
-                            buffer.at(nickPos - 4) == 0 &&
-                            buffer.at(nickPos+4+buffer.at(nickPos)*2)   == 0 &&
-                            buffer.at(nickPos+4+buffer.at(nickPos)*2+1) == 0 &&
-                            buffer.at(nickPos+4+buffer.at(nickPos)*2+2) == 0 &&
-                            buffer.at(nickPos+4+buffer.at(nickPos)*2+3) == 0) {
-                            QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
-                            if(!steamIdStr.contains(QRegExp("^[0-9]{17}$")))
-                                continue;
-                            QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer.at(nickPos) * 2).data()).left(buffer.at(nickPos));
+//            if(mbi.Type==MEM_PRIVATE&&
+//                mbi.AllocationProtect==PAGE_READWRITE&&
+//                mbi.Protect==PAGE_READWRITE&&
+//                mbi.State==MEM_COMMIT&&mbi.RegionSize<0xFFF000)
+//            {
+//                for (PCHAR readAddr = (PCHAR)mbi.BaseAddress; readAddr < (PCHAR)mbi.BaseAddress+mbi.RegionSize; readAddr += 30200) {
+//                    SIZE_T bytesRead = 0;
+//                    if(!ReadProcessMemory(hProcess, (PVOID)readAddr, buffer.data(), 30400, &bytesRead)){
+//                        if(GetLastError()!=299)
+//                            qDebug() << "Could not read process memory" << GetLastError();
+//                        continue;
+//                    }
+//                    for (int i = 0; i < static_cast<int>(bytesRead - 200); i++) {
+//                        bool match = false;
+//                        for (int j = 0; j < static_cast<int>(sizeof(steamHeader)); j++)
+//                            if (buffer[i + j] != steamHeader[j]){
+//                                match = false;
+//                                break;
+//                            }else match = true;
+//                        if (!match)continue;
+//                        int nickPos = i + 56;
+//                        if (buffer.at(nickPos) < 50 &&
+//                            buffer.at(nickPos) > 0 &&
+//                            buffer.at(nickPos + 1) == 0 &&
+//                            buffer.at(nickPos + 2) == 0 &&
+//                            buffer.at(nickPos + 3) == 0 &&
+//                            buffer.at(nickPos - 1) == 0 &&
+//                            buffer.at(nickPos - 2) == 0 &&
+//                            buffer.at(nickPos - 3) == 0 &&
+//                            buffer.at(nickPos - 4) == 0 &&
+//                            buffer.at(nickPos+4+buffer.at(nickPos)*2)   == 0 &&
+//                            buffer.at(nickPos+4+buffer.at(nickPos)*2+1) == 0 &&
+//                            buffer.at(nickPos+4+buffer.at(nickPos)*2+2) == 0 &&
+//                            buffer.at(nickPos+4+buffer.at(nickPos)*2+3) == 0) {
+//                            QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
+//                            if(!steamIdStr.contains(QRegExp("^[0-9]{17}$")))
+//                                continue;
+//                            QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer.at(nickPos) * 2).data()).left(buffer.at(nickPos));
 
-                            if(!AllPlayersInfo.contains(steamIdStr)){
-                                qDebug() << "Player found:" << nick << QString("http://steamcommunity.com/profiles/"+steamIdStr);
-                                AllPlayersInfo.insert(steamIdStr, nick);
-                            }
-                            else if(AllPlayersInfo.value(steamIdStr)!=nick)
-                                AllPlayersInfo[steamIdStr]=nick;
-                        }
-                    }
-                }
-            }
-            ptr1Count = ptr1Count + (int)mbi.RegionSize;
-            ptr1 = (PVOID)ptr1Count;
-        }
-    }
-
-    if(!PlayersInfo.isEmpty()&&get_stats){
+//                            if(!AllPlayersInfo.contains(steamIdStr)){
+//                                qDebug() << "Player found:" << nick << QString("http://steamcommunity.com/profiles/"+steamIdStr);
+//                                AllPlayersInfo.insert(steamIdStr, nick);
+//                            }
+//                            else if(AllPlayersInfo.value(steamIdStr)!=nick)
+//                                AllPlayersInfo[steamIdStr]=nick;
+//                        }
+//                    }
+//                }
+//            }
+//            ptr1Count = ptr1Count + mbi.RegionSize;
+//            ptr1 = (PVOID)ptr1Count;
+//        }
+//    }
+//    qDebug() << "get_stats";
+    if(get_stats&&enableDXHook){
         if(!PlayersInfo.contains(sender_steamID))
             PlayersInfo.append(sender_steamID);
         QString sids = PlayersInfo.join(",");
         Request test_request{server_addr+"/stats.php?key="+QLatin1String(SERVER_KEY)+"&sids="+sids+"&version="+version+"&sender_sid="+sender_steamID+"&"};
         QByteArray reply = sender->get(test_request);
-
-        if(enableDXHook){
-            QVariantList players_info = QtJson::json_to_list(reply);
-            int i = 0;
-            foreach(QVariant item, players_info){
-                QVariantMap tempMap = item.toMap();
-                QByteArray stats_btr = tempMap.value("name", "").toString().toUtf8();
-                if(!stats_btr.isEmpty()){
-                    memset(lpSharedMemory->lobbyPlayers[i].name, 0, 100);
-                    memcpy(lpSharedMemory->lobbyPlayers[i].name, stats_btr.data(), stats_btr.size());
-                    lpSharedMemory->lobbyPlayers[i].race = tempMap.value("race", 0).toInt();
-                    lpSharedMemory->lobbyPlayers[i].gamesCount = tempMap.value("gamesCount", 0).toInt();
-                    lpSharedMemory->lobbyPlayers[i].winsCount = tempMap.value("winsCount", 0).toInt();
-                    lpSharedMemory->lobbyPlayers[i].winRate = tempMap.value("winRate", 0).toInt();
-                    lpSharedMemory->lobbyPlayers[i].mmr = tempMap.value("mmr", 0).toInt();
-                    lpSharedMemory->lobbyPlayers[i].mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
-                    lpSharedMemory->lobbyPlayers[i].apm = tempMap.value("apm", 0).toDouble();
-                    ++i;
-                }
+        QVariantList players_info = QtJson::json_to_list(reply);
+        int i = 0;
+        foreach(QVariant item, players_info){
+            QVariantMap tempMap = item.toMap();
+            QByteArray stats_btr = tempMap.value("name", "").toString().toUtf8();
+            if(!stats_btr.isEmpty()){
+                memset(lpSharedMemory->lobbyPlayers[i].name, 0, 100);
+                memcpy(lpSharedMemory->lobbyPlayers[i].name, stats_btr.data(), stats_btr.size());
+                lpSharedMemory->lobbyPlayers[i].race = tempMap.value("race", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i].gamesCount = tempMap.value("gamesCount", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i].winsCount = tempMap.value("winsCount", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i].winRate = tempMap.value("winRate", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i].mmr = tempMap.value("mmr", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i].mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i].apm = tempMap.value("apm", 0).toInt();
+                ++i;
             }
-            if(i)lpSharedMemory->playersNumber = i;
         }
+        if(i)lpSharedMemory->playersNumber = i;
     }
     CloseHandle(hProcess);
     return 0;

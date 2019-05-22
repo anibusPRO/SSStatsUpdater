@@ -12,8 +12,8 @@ APMMeter::APMMeter()
 
 APMMeter::~APMMeter()
 {
-    UnhookWindowsHookEx(keyboardHook);
-    UnhookWindowsHookEx(mouseHook);
+//    UnhookWindowsHookEx(keyboardHook);
+//    UnhookWindowsHookEx(mouseHook);
     delete measure;
 }
 
@@ -44,13 +44,13 @@ int APMMeter::init() {
 
 void APMMeter::start()
 {
-    if(!initialized)
-    {
-        if(init()!=0)
-            return;
-        else
-            initialized = true;
-    }
+//    if(!initialized)
+//    {
+//        if(init()!=0)
+//            return;
+//        else
+//            initialized = true;
+//    }
 
     stopped = false;
 
