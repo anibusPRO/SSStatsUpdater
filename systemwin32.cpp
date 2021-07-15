@@ -142,7 +142,9 @@ void systemWin32::updateProcessList()
 // принимает имя процесса, возвращает true, если процесс запущен
 bool systemWin32::findProcess_2(QString findProcName)
 {
-    WCHAR temp[findProcName.size()+1]={0};
+    WCHAR temp[findProcName.size()+1];
+    memset(temp, 0, findProcName.size()+1);
+    temp[findProcName.size()+1]={0};
     findProcName.toWCharArray(temp);
 
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -207,7 +209,9 @@ QStringList systemWin32::getAllProcessList()
 
 DWORD systemWin32::getProcessIDByWindowName(QString name)
 {
-    WCHAR temp[name.size()+1]={0};
+    WCHAR temp[name.size()+1];
+    memset(temp, 0, name.size()+1);
+    temp[name.size()+1]={0};
     name.toWCharArray(temp);
     HWND hWnd = FindWindow(NULL, temp);
     DWORD PID;
@@ -220,7 +224,9 @@ DWORD systemWin32::getProcessIDByWindowName(QString name)
 
 bool systemWin32::findProcessByWindowName(QString name)
 {
-    WCHAR temp[name.size()+1]={0};
+    WCHAR temp[name.size()+1];
+    memset(temp, 0, name.size()+1);
+    temp[name.size()+1]={0};
     name.toWCharArray(temp);
     HWND hWnd = FindWindow(NULL, temp);
     if(hWnd)

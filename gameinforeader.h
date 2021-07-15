@@ -15,7 +15,7 @@
 #ifdef HAVE_QT5
 #   include <QJsonDocument>
 #else
-#   include "json.h"
+#   include "json.hpp"
 #endif
 
 #define MINIMUM_DURATION 30

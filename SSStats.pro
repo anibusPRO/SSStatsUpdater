@@ -8,13 +8,13 @@ TEMPLATE = app
 
 TARGET = SSStats
 
-PROJECT_PATH = "F:/OpenServer/domains/dowstats.loc/ssstats"
+PROJECT_PATH = "C:/projects/SSStatsCollector"
 DESTDIR      = $$PROJECT_PATH
 target.path = $$quote($$(PROGRAMFILES)/Steam/steamapps/common/Dawn of War Soulstorm)
 target.files = $$DESTDIR/SSStats.exe
 INSTALLS += target
 RC_FILE = ssstats.rc
-INCLUDEPATH += F:/boost/include/boost-1_63
+//INCLUDEPATH += F:/boost/include/boost-1_63
 
 
 #PRE_TARGETDEPS += .beforebuild
@@ -48,8 +48,6 @@ SOURCES += main.cpp \
         OSDaB-Zip/zip.cpp \
         OSDaB-Zip/zipglobal.cpp \
         APMMeasure.cpp \
-    qtxglobalshortcut/qxtglobalshortcut.cpp \
-    qtxglobalshortcut/qxtglobalshortcut_win.cpp
 
 
 HEADERS += request.h \
@@ -67,6 +65,7 @@ HEADERS += request.h \
         apmmeter.h \
         systemwin32.h \
         vdf_parser.hpp \
+        types.h \
         OSDaB-Zip/unzip.h \
         OSDaB-Zip/unzip_p.h \
         OSDaB-Zip/zip.h \
@@ -76,18 +75,14 @@ HEADERS += request.h \
         APMMeasure.h \
         version.h \
         defines.h \
-    qtxglobalshortcut/qxtglobal.h \
-    qtxglobalshortcut/qxtglobalshortcut.h \
-    qtxglobalshortcut/qxtglobalshortcut_p.h \
-    types.h
 
 
 LIBS += -lpsapi -lz
 
-include(F:/Programming/SSStats/qt_json/qt_json.pri)
+include(C:/projects/SSStatsCollector/qt_json/qt_json.pri)
 
 win32 {
-    WINSDK_DIR = F:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A
+    WINSDK_DIR = C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x86
 #    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
     QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"${DESTDIR_TARGET};1\""
 

@@ -46,13 +46,17 @@ char ExtendedBinReader::ReadChar()
 
 QString ExtendedBinReader::ReadStringUTF8(int count)
 {
-    char temp[count+1]={0};
+    char temp[count];
+    memset(temp, 0, count+1);
+    temp[count+1]={0};
     readRawData(temp, count);
     return QString::fromUtf8(temp);
 }
 QString ExtendedBinReader::ReadStringUTF16(int count)
 {
-    char temp[count*2+2]={0};
+    char temp[count*2+2];
+    memset(temp, 0, count*2+2);
+    temp[count*2+2]={0};
     readRawData(temp, count*2);
     return QString::fromUtf16((ushort*)temp);
 }
@@ -65,7 +69,9 @@ void ExtendedBinReader::WriteInt32(int num)
 // читает массив байт размером count из бинарного файла и возвращает его
 QByteArray ExtendedBinReader::ReadBytesArray(int count)
 {
-    char temp[count] = {0};
+    char temp[count];
+    memset(temp, 0, count);
+    temp[count] = {0};
     readRawData(temp, count);
     return QByteArray(temp);
 }

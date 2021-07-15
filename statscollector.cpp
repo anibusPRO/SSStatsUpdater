@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <windows.h>
 #include <QApplication>
+#include <qt_json/json.h>
 
 using namespace tyti;
 using namespace std;
@@ -33,7 +34,6 @@ const int GAME_RUNNING_TUNNGLE = 1;
 PVOID FogAddr = (PVOID)0x008282F0;
 PVOID MapSkyDistanceAddr = (PVOID)0x0082A33A;
 PVOID Float512Addr = (PVOID)0x00AF54C8;
-PVOID HPAddr = (PVOID)0x00956596;
 
 DWORD Float512OldProtect;
 
@@ -41,13 +41,14 @@ BYTE CodeMapSkyDistance[6] = {0xD9, 0x9B, 0x70, 0x0C, 0x00, 0x00};
 BYTE CodeF512[4] = {0x00, 0x00, 0xC0, 0x42};
 BYTE Float512[4] = {0x00, 0x00, 0x00, 0x44};
 BYTE CodeFog[6] = {0xD9, 0x81, 0x60, 0x0C, 0x00, 0x00};
-BYTE CodeHP[4] = {0x84, 0xDB, 0x74, 0x19};
 
 BYTE nop_array6[6] = {0x90,0x90,0x90,0x90,0x90,0x90};
-BYTE nop_array4[4] = {0x90,0x90,0x90,0x90};
 BYTE temp6[6] = {0};
 BYTE temp6_2[6] = {0};
-BYTE temp4[4] = {0};
+
+BYTE temp4[6] = {0};
+BYTE temp4_2[6] = {0};
+
 
 StatsCollector::StatsCollector(QObject *parent) :
     QObject(parent)
@@ -59,16 +60,16 @@ StatsCollector::StatsCollector(QObject *parent) :
     server_addr = "http://www.dowstats.ru";
     cur_time = QDateTime::currentDateTime();
     reader = new GameInfoReader();
-    lpSharedMemory = nullptr;
-    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
-    if(hSharedMemory)
-        lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
-    else
-        qDebug() << "CreateFileMapping: Error" << GetLastError();
+    lpSharedMemory = new PGameInfo();
+    //* hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
+    //if(hSharedMemory)
+        //lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
+    //else
+    //    qDebug() << "CreateFileMapping: Error" << GetLastError();
 
     if(lpSharedMemory){
         lpSharedMemory->fontsInited = true;
-        memset(lpSharedMemory->players, 0, 400);
+        //*memset(lpSharedMemory->players, 0, 400);
         lpSharedMemory->playersNumber = 0;
         lpSharedMemory->downloadProgress = 0;
         memset(&lpSharedMemory->mapName[0], 0, 50);
@@ -104,17 +105,15 @@ bool StatsCollector::start()
     server_addr = settings.value("info/serverAddr", server_addr).toString();
     qDebug() << "Server:" << server_addr << "Version:" << version;
     enableStats = settings.value("settings/enableStats", true).toBool();
-    enableDXHook = false;
+    enableDXHook = true;
     gameGoing = false;
-    if(lpSharedMemory){
-        lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
-        if(enableDXHook){
-            lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
-            lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
-            lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
-            lpSharedMemory->version = version.toInt();
-            lpSharedMemory->statsThrId = GetCurrentThreadId();
-        }
+    lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
+    if(enableDXHook){
+        lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
+        lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
+        lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
+        lpSharedMemory->version = version.toInt();
+        lpSharedMemory->statsThrId = GetCurrentThreadId();
     }
     if(!enableStats) qDebug() << "STATS DISABLED";
     if(enableDXHook){
@@ -124,12 +123,12 @@ bool StatsCollector::start()
         QString showAPMHK  = settings.value("hotkeys/showAPMHK", "Ctrl+Shift+A").toString();
 //        QString showHPHK  = settings.value("hotkeys/showHPHK", "Alt").toString();
 
-        QxtGlobalShortcut* menuShortcut = new QxtGlobalShortcut(QKeySequence(showMenuHK), this);
-        connect(menuShortcut, SIGNAL(activated()), this, SLOT(toggleMenuVisibility()));
-        QxtGlobalShortcut* racesShortcut = new QxtGlobalShortcut(QKeySequence(showRaceHK), this);
-        connect(racesShortcut, SIGNAL(activated()), this, SLOT(toggleRacesVisibility()));
-        QxtGlobalShortcut* apmShortcut = new QxtGlobalShortcut(QKeySequence(showAPMHK), this);
-        connect(apmShortcut, SIGNAL(activated()), this, SLOT(toggleAPMVisibility()));
+        //*QxtGlobalShortcut* menuShortcut = new QxtGlobalShortcut(QKeySequence(showMenuHK), this);
+        //* connect(menuShortcut, SIGNAL(activated()), this, SLOT(toggleMenuVisibility()));
+        //*QxtGlobalShortcut* racesShortcut = new QxtGlobalShortcut(QKeySequence(showRaceHK), this);
+        //*connect(racesShortcut, SIGNAL(activated()), this, SLOT(toggleRacesVisibility()));
+        //*QxtGlobalShortcut* apmShortcut = new QxtGlobalShortcut(QKeySequence(showAPMHK), this);
+        //*connect(apmShortcut, SIGNAL(activated()), this, SLOT(toggleAPMVisibility()));
 //        QxtGlobalShortcut* hpShortcut = new QxtGlobalShortcut(QKeySequence(showHPHK), this);
 //        connect(hpShortcut, SIGNAL(activated()), this, SLOT(toggleHPVisibility()));
     } else qDebug() << "DXHOOK DISABLED";
@@ -217,6 +216,7 @@ void StatsCollector::check_game_steam()
     /* если время последнего изменения файла больше предыдущего,
     то это либо начало игры, либо конец, что необходимо обработать */
     if(last_modified>cur_time){
+        qDebug() << "Start or end game handler";
         QTimer showRacesTimer;
         bool procIsActive = true, isObserver = false;
         int e_code = 0;
@@ -266,7 +266,7 @@ void StatsCollector::check_game_steam()
                         if(!players.isEmpty()){
                             for(int i=0; i<players.size(); ++i){
                                 qDebug() << players.at(i);
-                                memcpy(&lpSharedMemory->players[i][0], players.at(i).toStdString().data(), 100);
+                                //*memcpy(&lpSharedMemory->players[i][0], players.at(i).toStdString().data(), 100);
                             }
 
                             showRacesTimer.setSingleShot(true);
@@ -303,7 +303,7 @@ void StatsCollector::check_game_steam()
                 apm_meter.stop();
                 if(enableDXHook){
                     for(int i=0; i<8; ++i)
-                        memset(&lpSharedMemory->players[i][0], 0, 100);
+                        //*memset(lpSharedMemory->players[i][0], 0, 100);
                     lpSharedMemory->CurrentAPM = 0;
                     lpSharedMemory->AverageAPM = 0;
                     lpSharedMemory->MaxAPM = 0;
@@ -322,7 +322,11 @@ void StatsCollector::check_game_steam()
         }
         send_logfiles();
     }else{
-        if(systemWin32::findProcessByWindowName("Dawn of War: Soulstorm")){
+        qDebug() << "Middle game handler";
+        HWND hWnd = FindWindow(nullptr, L"Dawn of War: Soulstorm");
+        if(hWnd==nullptr) return;
+
+        if(hWnd!=nullptr){
             if(!gameGoing){
                 // получим новые значения флагов
                 enableStats = settings.value("settings/enableStats", true).toBool();
@@ -339,6 +343,7 @@ void StatsCollector::check_game_steam()
 
             GetSteamPlayersInfo();
         }else{
+            qDebug() << "Process not found";
             closeWithGame = settings.value("settings/closeWithGame", false).toBool();
             if(closeWithGame){
                 qDebug() << "closeWithGame";
@@ -403,10 +408,10 @@ void StatsCollector::updateProgress(qint64 bytesSent, qint64 bytesTotal)
 
 void StatsCollector::toggleAPMVisibility()
 {
-    if(lpSharedMemory){
+    //if(lpSharedMemory){
         lpSharedMemory->showAPM = !lpSharedMemory->showAPM;
         qDebug() << "APMVisibility:" << (lpSharedMemory->showAPM?"On":"Off");
-    }
+    //}
 }
 
 
@@ -418,18 +423,18 @@ void StatsCollector::exitHandler()
 
 void StatsCollector::toggleRacesVisibility()
 {
-    if(lpSharedMemory){
+    //if(lpSharedMemory){
         lpSharedMemory->showRaces = !lpSharedMemory->showRaces;
         qDebug() << "RacesVisibility:" << (lpSharedMemory->showRaces?"On":"Off");
-    }
+    //}
 }
 
 void StatsCollector::toggleMenuVisibility()
 {
-    if(lpSharedMemory){
+    //if(lpSharedMemory){
         lpSharedMemory->showMenu = !lpSharedMemory->showMenu;
         qDebug() << "MenuVisibility:" << (lpSharedMemory->showMenu?"On":"Off");
-    }
+    //}
 }
 
 void StatsCollector::download_map(QString map_name)
@@ -511,20 +516,21 @@ void StatsCollector::processFlags(bool force)
     // то возврат из функции
     if(tFog==curFog/*&&tHP==curHP*/&&!force) return;
 
-    if(lpSharedMemory){
+    //if(lpSharedMemory){
         lpSharedMemory->enableDXHook = enableDXHook = settings.value("settings/enableDXHook", false).toBool();
         if(enableDXHook){
             lpSharedMemory->showMenu = showMenu = settings.value("settings/showMenu", true).toBool();
             lpSharedMemory->showRaces = showRaces = settings.value("settings/showRaces", true).toBool();
             lpSharedMemory->showAPM = showAPM = settings.value("settings/showAPM", true).toBool();
         }
-    }
+    //}
 
     // получаем HANDLE процесса игры
     HWND hWnd = FindWindow(nullptr, L"Dawn of War: Soulstorm");
     if(hWnd==nullptr) return;
     DWORD PID;
     GetWindowThreadProcessId(hWnd, &PID);
+    qDebug() << "PID = " << PID;
     HANDLE hProcess = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, PID);
     if(hProcess==nullptr){
         qDebug() << "Could not open process" << GetLastError();
@@ -711,7 +717,7 @@ StatsCollector::~StatsCollector()
     sender_thread->wait();
 
     if(lpSharedMemory){
-        memset(lpSharedMemory, 0, sizeof(TGameInfo));
+        //*memset(lpSharedMemory, 0, sizeof(TGameInfo));
         UnmapViewOfFile(lpSharedMemory);
     }
     if(hSharedMemory){
@@ -731,6 +737,7 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
         return GetLastError();
     }
     GetWindowThreadProcessId(hWnd, &PID);
+    qDebug() << "PID = " << PID;
 
     // Получение дескриптора процесса
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION |
@@ -742,9 +749,13 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
 //    if(!useOldSIDSearch){
     lpSharedMemory->sidsAddrLock = true;
     QByteArray buffer(30400, 0);
-    for(int i=0; i<10; ++i){
+    lpSharedMemory->sidsAddr[0] = (PVOID)0x18680000;
+    lpSharedMemory->sidsAddr[1] = (PVOID)0x1FA0985C;
+    lpSharedMemory->sidsAddr[2] = (PVOID)0x1FA1E5AE;
+    lpSharedMemory->sidsAddr[3] = (PVOID)0x1FA25166;
+    for(int i=0; i<4; ++i){
         PVOID readAddr = lpSharedMemory->sidsAddr[i];
-//        qDebug() << i << "address of steam IDs:" << readAddr;
+        qDebug() << i << "address of steam IDs:" << readAddr;
         SIZE_T bytesRead = 0;
         // если функция вернула не ноль, то продолжим цикл
         if(!ReadProcessMemory(hProcess, readAddr, buffer.data(), 30400, &bytesRead)){
@@ -777,16 +788,20 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
                 QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
                 if(!steamIdStr.contains(QRegExp("^[0-9]{17}$")))
                     continue;
-                if(get_stats&&!PlayersInfo.contains(steamIdStr))
-                    PlayersInfo.append(steamIdStr);
+                //*if(get_stats&&!PlayersInfo.contains(steamIdStr))
+                //*    PlayersInfo.append(steamIdStr);
                 QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer.at(nickPos) * 2).data()).left(buffer.at(nickPos));
 
                 if(!AllPlayersInfo.contains(steamIdStr)){
                     qDebug() << "Player found:" << nick << QString("http://steamcommunity.com/profiles/"+steamIdStr);
                     AllPlayersInfo.insert(steamIdStr, nick);
+                    qDebug() << "Успешно вставили " << nick;
                 }
-                else if(AllPlayersInfo.value(steamIdStr)!=nick)
+                else if(AllPlayersInfo.value(steamIdStr)!=nick){
+                    qDebug() << "Сейчас упаду как!";
                     AllPlayersInfo[steamIdStr]=nick;
+                }
+
             }
         }
     }
@@ -891,15 +906,15 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
             QVariantMap tempMap = item.toMap();
             QByteArray stats_btr = tempMap.value("name", "").toString().toUtf8();
             if(!stats_btr.isEmpty()){
-                memset(lpSharedMemory->lobbyPlayers[i].name, 0, 100);
-                memcpy(lpSharedMemory->lobbyPlayers[i].name, stats_btr.data(), stats_btr.size());
-                lpSharedMemory->lobbyPlayers[i].race = tempMap.value("race", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i].gamesCount = tempMap.value("gamesCount", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i].winsCount = tempMap.value("winsCount", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i].winRate = tempMap.value("winRate", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i].mmr = tempMap.value("mmr", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i].mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i].apm = tempMap.value("apm", 0).toInt();
+                memset(lpSharedMemory->lobbyPlayers[i]->name, 0, 100);
+                memcpy(lpSharedMemory->lobbyPlayers[i]->name, stats_btr.data(), stats_btr.size());
+                lpSharedMemory->lobbyPlayers[i]->race = tempMap.value("race", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i]->gamesCount = tempMap.value("gamesCount", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i]->winsCount = tempMap.value("winsCount", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i]->winRate = tempMap.value("winRate", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i]->mmr = tempMap.value("mmr", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i]->mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
+                lpSharedMemory->lobbyPlayers[i]->apm = tempMap.value("apm", 0).toInt();
                 ++i;
             }
         }

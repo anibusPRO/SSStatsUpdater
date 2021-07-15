@@ -5,6 +5,7 @@
 #include <QVariantList>
 #include <QCoreApplication>
 #include <QSettings>
+#include <qt_json/json.h>
 #include <windows.h>
 
 GameInfoReader::GameInfoReader()

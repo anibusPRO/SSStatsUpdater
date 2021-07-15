@@ -1,8 +1,10 @@
 #pragma once
 
 #include <windows.h>
-#include "..\APMKeyHook\APMKeyHook.h"
+
 #include "types.h"
+#include <QtCore/QtGlobal>
+#include <QCoreApplication>
 
 #define RING_SIZE 20
 #define MEASURE_CYCLE_LENGTH 500
@@ -22,6 +24,43 @@ typedef struct {
 	BOOL valid;
 	APMSnapshot snap;
 } APMLoggableSnapshot;
+
+class LobbyPlayers : public QObject {
+public:
+  int race;
+  int gamesCount;
+  int winsCount;
+  int winRate;
+  int mmr;
+  int mmr1v1;
+  int apm;
+  char name[];
+};
+
+class PGameInfo {
+public:
+    PGameInfo();
+    ~PGameInfo();
+    bool fontsInited = false;
+    LobbyPlayers* lobbyPlayers[8];
+    char* players[8][2];
+    int playersNumber;
+    int downloadProgress;
+    char mapName[1];
+    PVOID sidsAddr[10];
+    long CurrentAPM;
+    long AverageAPM;
+    long MaxAPM;
+    LONG total_actions;
+    bool enableDXHook;
+    bool showMenu;
+    bool showRaces;
+    bool showAPM;
+    bool sidsAddrLock;
+    DWORD statsThrId;
+    int version;
+
+};
 
 class APMMeasure {
 public:

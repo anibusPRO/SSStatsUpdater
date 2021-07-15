@@ -1,4 +1,3 @@
-#include <QCoreApplication>
 #include <QAbstractEventDispatcher>
 #include "statscollector.h"
 #include "systemwin32.h"

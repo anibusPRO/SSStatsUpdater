@@ -11,7 +11,6 @@
 #include <QTimer>
 #include <QThread>
 #include "defines.h"
-#include "qtxglobalshortcut/qxtglobalshortcut.h"
 #include "types.h"
 
 class StatsCollector : public QObject
@@ -60,7 +59,7 @@ private:
     GameInfoReader* reader;
     Logger log;
     HANDLE hSharedMemory;
-    PGameInfo lpSharedMemory;
+    PGameInfo* lpSharedMemory;
     QThread *sender_thread;
     QThread* apm_thread;
     QThread* monitor_thread;
