@@ -709,10 +709,17 @@ QString StatsCollector::get_soulstorm_installlocation()
 
     QSettings thq("HKEY_LOCAL_MACHINE\\SOFTWARE\\THQ\\Dawn of War - Soulstorm", QSettings::NativeFormat);
     path = thq.value("installlocation", "").toString();
+
     if(path.isEmpty())
     {
         QSettings sega("HKEY_LOCAL_MACHINE\\SOFTWARE\\SEGA\\Dawn of War - Soulstorm", QSettings::NativeFormat);
         path = sega.value("installlocation", "").toString();
+    }
+
+    if(path.isEmpty())
+    {
+        QSettings steam("HKEY_CURRENT_USER\\SOFTWARE\\Valve\\Steam", QSettings::NativeFormat);
+        path = steam.value("SteamPath", "").toString() + "\\steamapps\\common\\Dawn of War Soulstorm";
     }
     return path;
 }
