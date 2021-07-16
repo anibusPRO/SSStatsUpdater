@@ -26,6 +26,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QString>
+#include <QObject>
 
 using namespace tyti;
 using namespace std;
@@ -63,16 +64,25 @@ StatsCollector::StatsCollector(QObject *parent) :
     server_addr = "http://www.dowstats.ru";
     cur_time = QDateTime::currentDateTime();
     reader = new GameInfoReader();
-    lpSharedMemory = new PGameInfo();
-    //* hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
-    //if(hSharedMemory)
-        //lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
-    //else
-    //    qDebug() << "CreateFileMapping: Error" << GetLastError();
+
+    lpSharedMemory = nullptr;
+    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
+    if(hSharedMemory)
+        lpSharedMemory = static_cast<PGameInfo>(MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0));
+    else
+        qDebug() << "CreateFileMapping: Error" << GetLastError();
+
+
+    /*lpSharedMemory = new PGameInfo();
+    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
+    if(hSharedMemory)
+        lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
+    else
+        qDebug() << "CreateFileMapping: Error" << GetLastError();*/
 
     if(lpSharedMemory){
         lpSharedMemory->fontsInited = true;
-        //*memset(lpSharedMemory->players, 0, 400);
+        memset(lpSharedMemory->players, 0, 400);
         lpSharedMemory->playersNumber = 0;
         lpSharedMemory->downloadProgress = 0;
         memset(&lpSharedMemory->mapName[0], 0, 50);
@@ -812,8 +822,8 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
                 QString steamIdStr = QString::fromUtf16((ushort*)buffer.mid(i + 18, 34).data()).left(17);
                 if(!steamIdStr.contains(QRegExp("^[0-9]{17}$")))
                     continue;
-                //*if(get_stats&&!PlayersInfo.contains(steamIdStr))
-                //*    PlayersInfo.append(steamIdStr);
+                if(get_stats&&!PlayersInfo.contains(steamIdStr))
+                    PlayersInfo.append(steamIdStr);
                 QString nick = QString::fromUtf16((ushort*)buffer.mid(nickPos + 4, buffer.at(nickPos) * 2).data()).left(buffer.at(nickPos));
 
                 if(!AllPlayersInfo.contains(steamIdStr)){
@@ -934,16 +944,25 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
             QVariantMap tempMap = item.toMap();
             QByteArray stats_btr = tempMap.value("name", "").toString().toUtf8();
             if(!stats_btr.isEmpty()){
-                memset(lpSharedMemory->lobbyPlayers[i]->name, 0, 100);
-                memcpy(lpSharedMemory->lobbyPlayers[i]->name, stats_btr.data(), stats_btr.size());
-                lpSharedMemory->lobbyPlayers[i]->race = tempMap.value("race", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i]->gamesCount = tempMap.value("gamesCount", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i]->winsCount = tempMap.value("winsCount", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i]->winRate = tempMap.value("winRate", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i]->mmr = tempMap.value("mmr", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i]->mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
-                lpSharedMemory->lobbyPlayers[i]->apm = tempMap.value("apm", 0).toInt();
+                memset(lpSharedMemory->lPlayers[i].name, 0, 100);
+                memcpy(lpSharedMemory->lPlayers[i].name, stats_btr.data(), stats_btr.size());
+               /* lpSharedMemory->lPlayers[i].race = tempMap.value("race", 0).toInt();
+                lpSharedMemory->lPlayers[i].gamesCount = tempMap.value("gamesCount", 0).toInt();
+                lpSharedMemory->lPlayers[i].winsCount = tempMap.value("winsCount", 0).toInt();
+                lpSharedMemory->lPlayers[i].winRate = tempMap.value("winRate", 0).toInt();
+                lpSharedMemory->lPlayers[i].mmr = tempMap.value("mmr", 0).toInt();
+                lpSharedMemory->lPlayers[i].mmr1v1 = tempMap.value("mmr1v1", 0).toInt();
+                lpSharedMemory->lPlayers[i].apm = tempMap.value("apm", 0).toInt();*/
+                lpSharedMemory->lPlayers[i].info[0] = tempMap.value("race", 0).toInt();
+                lpSharedMemory->lPlayers[i].info[1] = tempMap.value("gamesCount", 0).toInt();
+                lpSharedMemory->lPlayers[i].info[2] = tempMap.value("winsCount", 0).toInt();
+                lpSharedMemory->lPlayers[i].info[3] = tempMap.value("winRate", 0).toInt();
+                lpSharedMemory->lPlayers[i].info[4] = tempMap.value("mmr", 0).toInt();
+                lpSharedMemory->lPlayers[i].info[5] = tempMap.value("mmr1v1", 0).toInt();
+                lpSharedMemory->lPlayers[i].info[6] = tempMap.value("apm", 0).toInt();
+
                 ++i;
+
             }
         }
         if(i)lpSharedMemory->playersNumber = i;

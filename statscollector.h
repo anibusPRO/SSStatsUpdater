@@ -13,6 +13,7 @@
 #include "defines.h"
 #include "qtxglobalshortcut/qxtglobalshortcut.h"
 #include "types.h"
+#include <cRender.h>
 
 class StatsCollector : public QObject
 {
@@ -60,7 +61,7 @@ private:
     GameInfoReader* reader;
     Logger log;
     HANDLE hSharedMemory;
-    PGameInfo* lpSharedMemory;
+    PGameInfo lpSharedMemory;
     QThread *sender_thread;
     QThread* apm_thread;
     QThread* monitor_thread;

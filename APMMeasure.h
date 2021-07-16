@@ -5,6 +5,7 @@
 #include "types.h"
 #include <QtCore/QtGlobal>
 #include <QCoreApplication>
+#include <cRender.h>
 
 #define RING_SIZE 20
 #define MEASURE_CYCLE_LENGTH 500
@@ -37,7 +38,7 @@ public:
   char name[];
 };
 
-class PGameInfo {
+/*class PGameInfo {
 public:
     PGameInfo();
     ~PGameInfo();
@@ -60,7 +61,7 @@ public:
     DWORD statsThrId;
     int version;
 
-};
+};*/
 
 class APMMeasure {
 public:

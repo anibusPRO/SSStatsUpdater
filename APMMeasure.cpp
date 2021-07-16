@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <QDebug>
 
-PGameInfo::PGameInfo(){
+
+/*PGameInfo::PGameInfo(){
     CurrentAPM = 0;
     AverageAPM = 0;
     MaxAPM = 0;
@@ -21,7 +22,7 @@ PGameInfo::~PGameInfo()
 {
 
 }
-
+*/
 APMMeasure::APMMeasure() {
     reset_pending = TRUE;
 
@@ -34,8 +35,8 @@ APMMeasure::APMMeasure() {
 //      DWORD dwMaximumSizeHigh, // размер файла (старшее слово)
 //      DWORD dwMaximumSizeLow,  // размер файла (младшее слово)
 //      LPCTSTR lpName);         // имя отображенного файла
-    //hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
-    //lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
+   // hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
+   // lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
 
 	resetAllAPM();
 }
@@ -51,7 +52,7 @@ long APMMeasure::getTotalActions() {
 //адрес которой передается в первом параметре, на значение,
 //передаваемое во втором параметре, возвращает значение переменной до замены
 
-    total_actions += InterlockedExchange(&lpSharedMemory.total_actions, 0);
+    total_actions += InterlockedExchange(&lpSharedMemory->total_actions, 0);
 
 	if(reset_pending && total_actions > 0) {
 		current_starttick = absolute_starttick = GetTickCount();
@@ -62,7 +63,7 @@ long APMMeasure::getTotalActions() {
 
 void APMMeasure::setTotalActions(long n) {
 	total_actions = n;
-    InterlockedExchange(&lpSharedMemory.total_actions, 0);
+    //InterlockedExchange(&lpSharedMemory->total_actions, 0);
 }
 
 // очищает массив действий

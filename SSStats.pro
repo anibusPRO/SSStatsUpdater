@@ -8,7 +8,7 @@ TEMPLATE = app
 
 TARGET = SSStats
 
-PROJECT_PATH = "C:/projects/SSStatsCollector"
+PROJECT_PATH = "C:/build/SSStats/SSStatsCollector"
 DESTDIR      = $$PROJECT_PATH
 target.path = $$quote($$(PROGRAMFILES)/Steam/steamapps/common/Dawn of War Soulstorm)
 target.files = $$DESTDIR/SSStats.exe
@@ -87,3 +87,11 @@ DEPENDPATH += $$PWD/qtxglobalshortcut
 
 win32:!win32-g++: PRE_TARGETDEPS += $$PWD/./qxtglobalshortcut.lib
 else:unix|win32-g++: PRE_TARGETDEPS += $$PWD/./libqxtglobalshortcut.a
+
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/./ -ldx_hook
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/./ -ldx_hook
+else:unix: LIBS += -L$$PWD/./ -ldx_hook
+
+#Тут нужно указать путь у .h файлам исходников DXHook
+INCLUDEPATH += $$PWD/../DXHook
+DEPENDPATH += $$PWD/../DXHook
