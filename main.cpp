@@ -8,7 +8,7 @@ namespace boost{
 
 int main(int argc, char *argv[])
 {
-    QTextCodec::setCodecForCStrings(QTextCodec::codecForName("utf-8"));
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("utf-8"));
     int res = 0;
 
     QCoreApplication app(argc, argv);

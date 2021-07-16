@@ -21,8 +21,10 @@
 #include <io.h>
 #include <fcntl.h>
 #include <windows.h>
-#include <QApplication>
-#include <qt_json/json.h>
+//#include <QApplication>
+//#include <qt_json/json.h>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 using namespace tyti;
 using namespace std;
@@ -645,7 +647,10 @@ bool StatsCollector::init_player()
     QString player_name;
 
     Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+sender_steamID+"&format=json");
-    QVariantMap player_info = QtJson::json_to_map(sender->get(request));
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson( sender->get(request));
+    QVariantMap player_info = jsonDoc.object().toVariantMap();
+    //QVariantMap player_info = QtJson::json_to_map(sender->get(request));
     QVariantMap response = player_info.value("response", QVariantMap()).toMap();
     QVariantList players = response.value("players", QVariantList()).toList();
     QVariantMap player = players.value(0, QVariantMap()).toMap();
@@ -670,7 +675,11 @@ void StatsCollector::check_name()
 {
     QString player_name;
     Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+sender_steamID+"&format=json");
-    QVariantMap player_info = QtJson::json_to_map(sender->get(request));
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson( sender->get(request));
+    QVariantMap player_info = jsonDoc.object().toVariantMap();
+
+    //QVariantMap player_info = QtJson::json_to_map(sender->get(request));
     QVariantMap response = player_info.value("response", QVariantMap()).toMap();
     QVariantList players = response.value("players", QVariantList()).toList();
     QVariantMap player = players.value(0, QVariantMap()).toMap();
@@ -900,7 +909,11 @@ DWORD StatsCollector::GetSteamPlayersInfo(bool get_stats) {
         QString sids = PlayersInfo.join(",");
         Request test_request{server_addr+"/stats.php?key="+QLatin1String(SERVER_KEY)+"&sids="+sids+"&version="+version+"&sender_sid="+sender_steamID+"&"};
         QByteArray reply = sender->get(test_request);
-        QVariantList players_info = QtJson::json_to_list(reply);
+
+        QJsonDocument jsonDoc = QJsonDocument::fromJson(reply);
+        QVariantMap players_info = jsonDoc.object().toVariantMap();
+
+        //QVariantList players_info = QtJson::json_to_list(reply);
         int i = 0;
         foreach(QVariant item, players_info){
             QVariantMap tempMap = item.toMap();

@@ -34,14 +34,14 @@ APMMeasure::APMMeasure() {
 //      DWORD dwMaximumSizeHigh, // размер файла (старшее слово)
 //      DWORD dwMaximumSizeLow,  // размер файла (младшее слово)
 //      LPCTSTR lpName);         // имя отображенного файла
-    hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
-    lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
+    //hSharedMemory = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(TGameInfo), L"DXHook-Shared-Memory");
+    //lpSharedMemory = (PGameInfo)MapViewOfFile(hSharedMemory, FILE_MAP_WRITE, 0, 0, 0);
 
 	resetAllAPM();
 }
 
 APMMeasure::~APMMeasure() {
-    //*UnmapViewOfFile(lpSharedMemory);
+    //UnmapViewOfFile(lpSharedMemory);
 	CloseHandle(hSharedMemory);
 }
 

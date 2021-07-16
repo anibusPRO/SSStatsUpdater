@@ -11,6 +11,7 @@
 #include <QTimer>
 #include <QThread>
 #include "defines.h"
+#include "qtxglobalshortcut/qxtglobalshortcut.h"
 #include "types.h"
 
 class StatsCollector : public QObject

@@ -14,7 +14,7 @@ target.path = $$quote($$(PROGRAMFILES)/Steam/steamapps/common/Dawn of War Soulst
 target.files = $$DESTDIR/SSStats.exe
 INSTALLS += target
 RC_FILE = ssstats.rc
-//INCLUDEPATH += F:/boost/include/boost-1_63
+#INCLUDEPATH += F:/boost/include/boost-1_63
 
 
 #PRE_TARGETDEPS += .beforebuild
@@ -49,7 +49,6 @@ SOURCES += main.cpp \
         OSDaB-Zip/zipglobal.cpp \
         APMMeasure.cpp \
 
-
 HEADERS += request.h \
         requestsender.h \
         gameinforeader.h \
@@ -75,15 +74,16 @@ HEADERS += request.h \
         APMMeasure.h \
         version.h \
         defines.h \
-
+        types.h
 
 LIBS += -lpsapi -lz
 
-include(C:/projects/SSStatsCollector/qt_json/qt_json.pri)
+#include(C:/projects/SSStatsCollector/qt_json/qt_json.pri)
 
-win32 {
-    WINSDK_DIR = C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x86
-#    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"$$OUT_PWD/${DESTDIR_TARGET};1\""
-    QMAKE_POST_LINK = "\"$$WINSDK_DIR/bin/mt.exe\" -manifest \"$$PWD/$$basename(TARGET).manifest\" -outputresource:\"${DESTDIR_TARGET};1\""
+unix|win32: LIBS += -L$$PWD/./ -lqxtglobalshortcut
 
-}
+INCLUDEPATH += $$PWD/qtxglobalshortcut
+DEPENDPATH += $$PWD/qtxglobalshortcut
+
+win32:!win32-g++: PRE_TARGETDEPS += $$PWD/./qxtglobalshortcut.lib
+else:unix|win32-g++: PRE_TARGETDEPS += $$PWD/./libqxtglobalshortcut.a

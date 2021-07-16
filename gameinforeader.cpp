@@ -5,8 +5,9 @@
 #include <QVariantList>
 #include <QCoreApplication>
 #include <QSettings>
-#include <qt_json/json.h>
+//#include <qt_json/json.h>
 #include <windows.h>
+#include <QJsonObject>
 
 GameInfoReader::GameInfoReader()
 {
@@ -275,7 +276,11 @@ int GameInfoReader::read_game_info(QMap<QString, QString> *sids, long totalActio
         k++;
     file.seek(k);
     QByteArray testStats = file.readAll();
-    QVariantMap stats = QtJson::to_map(testStats);
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(testStats);
+    QVariantMap stats = jsonDoc.object().toVariantMap();
+
+    //QVariantMap stats = QtJson::to_map(testStats);
     file.close();
     int parseRes = 0;
     if(!stats.contains("GSGameStats")) parseRes = 3;
@@ -470,7 +475,11 @@ QStringList GameInfoReader::get_players(bool with_mates)
         k++;
     file.seek(k);
     QByteArray testStats = file.readAll();
-    QVariantMap stats = QtJson::to_map(testStats);
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(testStats);
+    QVariantMap stats = jsonDoc.object().toVariantMap();
+
+    //QVariantMap stats = QtJson::to_map(testStats);
     file.close();
     int parseRes = 0;
     if(!stats.contains("GSGameStats")) parseRes = 3;

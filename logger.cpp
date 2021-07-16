@@ -59,8 +59,8 @@ void Logger::installLog(QString fileName)
         *logStream << QString("Runned at %1.").arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss")) << endl << endl;
     }
 
-    qInstallMsgHandler(customMessageHandler);
-//    qInstallMessageHandler(customMessageHandler);
+//    qInstallMsgHandler(customMessageHandler);
+    //qInstallMessageHandler(customMessageHandler);
     qDebug("Success opening log file");
 }
 
@@ -84,8 +84,8 @@ void Logger::finishLog()
     delete logFile;
     logFile = 0;
 
-    qInstallMsgHandler(0);
-//    qInstallMessageHandler(0);
+    //qInstallMsgHandler(0);
+    qInstallMessageHandler(0);
 }
 
 QString Logger::getOSInfo()

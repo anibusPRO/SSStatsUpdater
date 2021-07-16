@@ -11,12 +11,13 @@
 #include "repreader.h"
 #include "gameinfo.h"
 
+#include <QJsonDocument>
 
-#ifdef HAVE_QT5
+/*#ifdef HAVE_QT5
 #   include <QJsonDocument>
 #else
 #   include "json.hpp"
-#endif
+#endif*/
 
 #define MINIMUM_DURATION 30
 
