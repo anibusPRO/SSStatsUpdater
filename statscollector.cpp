@@ -25,6 +25,7 @@
 //#include <qt_json/json.h>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QString>
 
 using namespace tyti;
 using namespace std;
@@ -648,7 +649,14 @@ bool StatsCollector::init_player()
 
     Request request("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="+QLatin1String(STEAM_API_KEY)+"&steamids="+sender_steamID+"&format=json");
 
+
     QJsonDocument jsonDoc = QJsonDocument::fromJson( sender->get(request));
+
+
+    //qDebug() << "baneblade" << QString::fromStdString(jsonDoc.toBinaryData().toStdString());
+
+
+
     QVariantMap player_info = jsonDoc.object().toVariantMap();
     //QVariantMap player_info = QtJson::json_to_map(sender->get(request));
     QVariantMap response = player_info.value("response", QVariantMap()).toMap();
